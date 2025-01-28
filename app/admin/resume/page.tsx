@@ -10,8 +10,7 @@ export default function AdminResume() {
     personalInfo: {
       name: "",
       email: "",
-      location: "",
-      linkedin: ""
+      location: ""
     },
     summary: "",
     education: [],
@@ -188,18 +187,7 @@ export default function AdminResume() {
                   className="w-full bg-gray-700 p-2 rounded"
                 />
               </div>
-              <div>
-                <label className="block mb-2">LinkedIn</label>
-                <input
-                  type="url"
-                  value={formData.personalInfo.linkedin}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    personalInfo: { ...formData.personalInfo, linkedin: e.target.value }
-                  })}
-                  className="w-full bg-gray-700 p-2 rounded"
-                />
-              </div>
+            
             </div>
           </section>
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Send } from "lucide-react"
+import { Mail, Send, Phone } from "lucide-react"
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -25,22 +25,6 @@ export default function Contact() {
     setLoading(true)
     setError(null)
     
-    // Validasi email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(formData.email)) {
-      setError("Format email tidak valid")
-      setLoading(false)
-      return
-    }
-
-    // Validasi nomor telepon Indonesia
-    const phoneRegex = /^(\+62|62|0)8[1-9][0-9]{6,9}$/
-    if (!phoneRegex.test(formData.phone.replace(/[\s-]/g, ''))) {
-      setError("Format nomor telepon tidak valid")
-      setLoading(false) 
-      return
-    }
-
     try {
       const response = await fetch("/api/contact", {
         method: "POST",
@@ -50,24 +34,21 @@ export default function Contact() {
         body: JSON.stringify(formData),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Gagal mengirim pesan")
-      }
+      if (!response.ok) throw new Error("Failed to send message")
       
       setSuccess(true)
       setFormData({ name: "", email: "", phone: "", message: "" })
       setTimeout(() => setSuccess(false), 5000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Terjadi kesalahan")
+      setError(err instanceof Error ? err.message : "Something went wrong")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex-1 min-h-screen py-16 flex flex-col">
-      <div className="max-w-2xl mx-auto px-8 w-full flex-grow">
+    <div className="min-h-screen py-16">
+      <div className="max-w-2xl mx-auto px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -81,12 +62,12 @@ export default function Contact() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-gray-800 p-8 rounded-lg shadow-lg mb-8"
+          className="bg-gray-800 p-8 rounded-lg shadow-lg"
         >
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="name" className="block text-white mb-2">
-                Nama
+                Name
               </label>
               <input
                 type="text"
@@ -95,9 +76,8 @@ export default function Contact() {
                 value={formData.name}
                 onChange={handleChange}
                 required
-                disabled={loading}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:border-blue-500 disabled:opacity-50"
-                placeholder="Nama anda"
+                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:border-blue-500"
+                placeholder="Your name"
               />
             </div>
             
@@ -112,8 +92,7 @@ export default function Contact() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                disabled={loading}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:border-blue-500"
                 placeholder="your.email@example.com"
               />
             </div>
@@ -129,8 +108,7 @@ export default function Contact() {
                 value={formData.phone}
                 onChange={handleChange}
                 required
-                disabled={loading}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:border-blue-500"
                 placeholder="+62 xxx-xxxx-xxxx"
               />
             </div>
@@ -146,8 +124,7 @@ export default function Contact() {
                 onChange={handleChange}
                 required
                 rows={5}
-                disabled={loading}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:border-blue-500"
                 placeholder="Your message here..."
               ></textarea>
             </div>
@@ -156,23 +133,17 @@ export default function Contact() {
               <button
                 type="submit"
                 disabled={loading}
-                className={`
-                  bg-blue-600 text-white px-6 py-2 rounded-md 
-                  hover:bg-blue-700 transition duration-300 
-                  flex items-center gap-2
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  ${loading ? 'bg-blue-400' : ''}
-                `}
+                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition duration-300 flex items-center gap-2 disabled:opacity-50"
               >
                 {loading ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                    Mengirim...
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white"></div>
+                    Sending...
                   </>
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    Kirim Pesan
+                    Send Message
                   </>
                 )}
               </button>
@@ -181,13 +152,9 @@ export default function Contact() {
                 <motion.span
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="text-green-500 flex items-center gap-2"
+                  className="text-green-500"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  Pesan berhasil dikirim!
+                  Message sent successfully!
                 </motion.span>
               )}
               
@@ -195,12 +162,8 @@ export default function Contact() {
                 <motion.span
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="text-red-500 flex items-center gap-2"
+                  className="text-red-500"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
                   {error}
                 </motion.span>
               )}
