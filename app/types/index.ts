@@ -50,6 +50,7 @@ export interface Resume {
     name: string
     email: string
     location: string
+    linkedin?: string
   }
   summary: string
   education: {
@@ -66,7 +67,7 @@ export interface Resume {
     period: string
     achievements: string[]
   }[]
-  pdfUrl?: string
+  pdfUrl: string
 }
 
 export interface ContactMessage {

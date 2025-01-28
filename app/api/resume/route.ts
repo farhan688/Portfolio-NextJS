@@ -20,7 +20,8 @@ async function readData(): Promise<Resume> {
       },
       summary: "",
       education: [],
-      experience: []
+      experience: [],
+      pdfUrl: ""
     }
   }
 }
