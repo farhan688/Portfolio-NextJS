@@ -227,7 +227,7 @@ export default function AdminProjects() {
         <div className="space-y-4">
           {projects.map((project) => (
             <motion.div
-              key={project.id}
+              key={project._id?.toString()}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="bg-gray-800 p-4 rounded-lg"
@@ -255,7 +255,7 @@ export default function AdminProjects() {
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDelete(project.id)}
+                    onClick={() => handleDelete(project._id?.toString() || "")}
                     className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
                   >
                     Delete

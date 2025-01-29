@@ -6,7 +6,7 @@ import type { About } from "@/app/types"
 
 export default function AdminAbout() {
   const [formData, setFormData] = useState<About>({
-    id: "1",
+    _id: undefined,
     title: "",
     description: "",
     imageUrl: "",
@@ -41,19 +41,35 @@ export default function AdminAbout() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      const dataToSend = {
+        ...formData,
+        socialLinks: formData.socialLinks || {
+          github: "",
+          linkedin: "",
+          twitter: "",
+          email: ""
+        }
+      }
+
       const response = await fetch("/api/about", {
-        method: "PUT",
+        method: formData._id ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dataToSend),
       })
 
-      if (!response.ok) throw new Error("Failed to save about data")
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to save about data")
+      }
       
+      const updatedData = await response.json()
+      setFormData(updatedData)
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
+      console.error('Submit error:', err)
       setError(err instanceof Error ? err.message : "Failed to save")
     }
   }

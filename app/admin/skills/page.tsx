@@ -8,12 +8,14 @@ export default function AdminSkills() {
   const [skills, setSkills] = useState<Skill[]>([])
   const [formData, setFormData] = useState<Partial<Skill>>({
     category: "",
-    items: [],
+    items: []
   })
   const [itemInput, setItemInput] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState<string>("")
 
   useEffect(() => {
     fetchSkills()
@@ -32,13 +34,23 @@ export default function AdminSkills() {
     }
   }
 
+  const showSuccess = (message: string) => {
+    setSuccessMessage(message)
+    setSuccess(true)
+    setTimeout(() => {
+      setSuccess(false)
+      setSuccessMessage("")
+    }, 3000)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
+    
     try {
-      const url = isEditing ? "/api/skills" : "/api/skills"
       const method = isEditing ? "PUT" : "POST"
       
-      const response = await fetch(url, {
+      const response = await fetch("/api/skills", {
         method,
         headers: {
           "Content-Type": "application/json",
@@ -46,66 +58,63 @@ export default function AdminSkills() {
         body: JSON.stringify(formData),
       })
 
-      if (!response.ok) throw new Error("Failed to save skill")
-      
+      const responseData = await response.json()
+
+      if (!response.ok) {
+        throw new Error(responseData.error || "Failed to save skill")
+      }
+
       await fetchSkills()
       resetForm()
+      showSuccess(isEditing ? "Skill updated successfully!" : "New skill added successfully!")
     } catch (err) {
+      console.error('Submit error:', err)
       setError(err instanceof Error ? err.message : "Failed to save")
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this skill category?")) return
+  const handleEdit = (skill: Skill) => {
+    setFormData({
+      _id: skill._id,
+      category: skill.category || "",
+      items: Array.isArray(skill.items) ? [...skill.items] : []
+    })
+    setIsEditing(true)
+    setError(null)
+  }
+
+  const handleDelete = async (id?: string) => {
+    if (!id || !confirm("Are you sure you want to delete this skill?")) return
     
     try {
       const response = await fetch(`/api/skills?id=${id}`, {
         method: "DELETE",
       })
       
-      if (!response.ok) throw new Error("Failed to delete skill")
+      const responseData = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(responseData.error || "Failed to delete skill")
+      }
       
       await fetchSkills()
+      showSuccess("Skill deleted successfully!")
     } catch (err) {
+      console.error('Delete error:', err)
       setError(err instanceof Error ? err.message : "Failed to delete")
     }
-  }
-
-  const handleEdit = (skill: Skill) => {
-    setFormData(skill)
-    setIsEditing(true)
   }
 
   const resetForm = () => {
     setFormData({
       category: "",
-      items: [],
+      items: []
     })
-    setItemInput("")
     setIsEditing(false)
-  }
-
-  const handleAddItem = () => {
-    if (itemInput.trim() && formData.items) {
-      setFormData({
-        ...formData,
-        items: [...formData.items, itemInput.trim()]
-      })
-      setItemInput("")
-    }
-  }
-
-  const handleRemoveItem = (index: number) => {
-    if (formData.items) {
-      setFormData({
-        ...formData,
-        items: formData.items.filter((_, i) => i !== index)
-      })
-    }
+    setItemInput("")
   }
 
   if (loading) return <div className="text-center p-8">Loading...</div>
-  if (error) return <div className="text-center text-red-500 p-8">{error}</div>
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
@@ -120,98 +129,94 @@ export default function AdminSkills() {
           </button>
         </div>
 
-        {/* Form */}
+        {error && (
+          <div className="bg-red-500 text-white p-4 rounded-lg mb-4">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-500 text-white p-4 rounded-lg mb-4">
+            {successMessage}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg mb-8">
-          <h2 className="text-xl font-semibold mb-4">
-            {isEditing ? "Edit Skill Category" : "Add New Skill Category"}
-          </h2>
-          <div className="grid grid-cols-1 gap-4">
+          <div className="mb-4">
             <input
               type="text"
-              placeholder="Category (e.g., Programming Languages)"
+              placeholder="Skill Category"
               value={formData.category}
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="bg-gray-700 p-2 rounded"
+              className="w-full bg-gray-700 p-2 rounded"
               required
             />
-            <div>
-              <div className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  placeholder="Add Skill"
-                  value={itemInput}
-                  onChange={(e) => setItemInput(e.target.value)}
-                  className="bg-gray-700 p-2 rounded flex-1"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddItem}
-                  className="bg-blue-600 px-4 rounded hover:bg-blue-700"
-                >
-                  Add
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {formData.items?.map((item, index) => (
-                  <span
-                    key={index}
-                    className="bg-blue-500 px-2 py-1 rounded-full text-sm flex items-center gap-2"
-                  >
-                    {item}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveItem(index)}
-                      className="hover:text-red-300"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
           </div>
-          <div className="mt-4 flex gap-2">
-            <button
-              type="submit"
-              className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
-            >
-              {isEditing ? "Update Skills" : "Add Skills"}
-            </button>
-            {isEditing && (
+
+          <div className="mb-4">
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                placeholder="Add Skill Item"
+                value={itemInput}
+                onChange={(e) => setItemInput(e.target.value)}
+                className="flex-1 bg-gray-700 p-2 rounded"
+              />
               <button
                 type="button"
-                onClick={resetForm}
-                className="bg-gray-600 px-4 py-2 rounded hover:bg-gray-700"
+                onClick={() => {
+                  if (itemInput.trim()) {
+                    setFormData({
+                      ...formData,
+                      items: [...(formData.items || []), itemInput.trim()]
+                    })
+                    setItemInput("")
+                  }
+                }}
+                className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
               >
-                Cancel
+                Add
               </button>
-            )}
+            </div>
+
+            <div className="space-y-2">
+              {formData.items?.map((item, index) => (
+                <div key={`form-item-${index}`} className="flex items-center gap-2 bg-gray-700 p-2 rounded">
+                  <span className="flex-1">{item}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({
+                      ...formData,
+                      items: formData.items?.filter((_, i) => i !== index)
+                    })}
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
+
+          <button
+            type="submit"
+            className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
+          >
+            {isEditing ? "Update Skill" : "Add Skill"}
+          </button>
         </form>
 
         {/* Skills List */}
         <div className="space-y-4">
           {skills.map((skill) => (
             <motion.div
-              key={skill.id}
+              key={skill._id?.toString() || `skill-${skill.category}`}
+              className="bg-gray-800 p-6 rounded-lg"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="bg-gray-800 p-4 rounded-lg"
             >
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold text-xl">{skill.category}</h3>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {skill.items.map((item, index) => (
-                      <span
-                        key={index}
-                        className="bg-blue-500 px-2 py-1 rounded-full text-sm"
-                      >
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-xl font-semibold">{skill.category}</h3>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleEdit(skill)}
@@ -220,12 +225,22 @@ export default function AdminSkills() {
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDelete(skill.id)}
+                    onClick={() => handleDelete(skill._id?.toString())}
                     className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
                   >
                     Delete
                   </button>
                 </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {skill.items.map((item, index) => (
+                  <span
+                    key={`${skill._id}-item-${index}`}
+                    className="bg-gray-700 px-3 py-1 rounded-full"
+                  >
+                    {item}
+                  </span>
+                ))}
               </div>
             </motion.div>
           ))}

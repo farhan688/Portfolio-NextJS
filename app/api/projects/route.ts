@@ -1,69 +1,101 @@
 import { NextResponse } from "next/server"
 import { Project } from "@/app/types"
-import fs from "fs/promises"
-import path from "path"
+import { MongoClient, ObjectId } from 'mongodb'
 
-const dataFile = path.join(process.cwd(), "data", "projects.json")
-
-async function readData(): Promise<Project[]> {
-  try {
-    const data = await fs.readFile(dataFile, "utf-8")
-    return JSON.parse(data)
-  } catch (error) {
-    return []
-  }
+if (!process.env.MONGODB_URI) {
+  throw new Error('MONGODB_URI environment variable is not defined')
 }
 
-async function writeData(data: Project[]): Promise<void> {
-  await fs.writeFile(dataFile, JSON.stringify(data, null, 2))
-}
+const client = new MongoClient(process.env.MONGODB_URI)
 
 export async function GET() {
-  const data = await readData()
-  return NextResponse.json(data)
+  try {
+    await client.connect()
+    const db = client.db('portfolio')
+    const projects = await db.collection('projects').find({}).toArray()
+    
+    const formattedProjects = projects.map(project => ({
+      ...project,
+      _id: project._id.toString()
+    }))
+    
+    return NextResponse.json(formattedProjects)
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 })
+  } finally {
+    await client.close()
+  }
 }
 
 export async function POST(request: Request) {
-  const project = await request.json()
-  const projects = await readData()
-  
-  const newProject = {
-    ...project,
-    id: Date.now().toString(),
+  try {
+    const project = await request.json()
+    await client.connect()
+    const db = client.db('portfolio')
+    
+    const result = await db.collection('projects').insertOne({
+      ...project,
+      createdAt: new Date()
+    })
+    
+    return NextResponse.json({ 
+      ...project, 
+      _id: result.insertedId 
+    })
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to create project' }, { status: 500 })
+  } finally {
+    await client.close()
   }
-  
-  projects.push(newProject)
-  await writeData(projects)
-  
-  return NextResponse.json(newProject)
 }
 
 export async function PUT(request: Request) {
-  const project = await request.json()
-  const projects = await readData()
-  
-  const index = projects.findIndex((p) => p.id === project.id)
-  if (index === -1) {
-    return NextResponse.json({ error: "Project not found" }, { status: 404 })
+  try {
+    const project = await request.json()
+    await client.connect()
+    const db = client.db('portfolio')
+    
+    const result = await db.collection('projects').updateOne(
+      { _id: new ObjectId(project._id) },
+      { $set: { ...project, updatedAt: new Date() } }
+    )
+    
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 })
+    }
+    
+    return NextResponse.json(project)
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to update project' }, { status: 500 })
+  } finally {
+    await client.close()
   }
-  
-  projects[index] = project
-  await writeData(projects)
-  
-  return NextResponse.json(project)
 }
 
 export async function DELETE(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const id = searchParams.get("id")
-  
-  if (!id) {
-    return NextResponse.json({ error: "ID is required" }, { status: 400 })
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get("id")
+    
+    if (!id) {
+      return NextResponse.json({ error: "ID is required" }, { status: 400 })
+    }
+    
+    await client.connect()
+    const db = client.db('portfolio')
+    
+    const result = await db.collection('projects').deleteOne({
+      _id: new ObjectId(id)
+    })
+    
+    if (result.deletedCount === 0) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 })
+    }
+    
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 })
+  } finally {
+    await client.close()
   }
-  
-  const projects = await readData()
-  const filtered = projects.filter((p) => p.id !== id)
-  await writeData(filtered)
-  
-  return NextResponse.json({ success: true })
 } 

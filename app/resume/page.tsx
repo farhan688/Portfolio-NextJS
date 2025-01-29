@@ -81,8 +81,8 @@ export default function Resume() {
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
               </svg>
-              Download PDF
-            </Link>
+          Download PDF
+        </Link>
           </motion.div>
         )}
       </div>
@@ -127,13 +127,13 @@ export default function Resume() {
       >
         <h2 className="text-2xl font-semibold mb-4 text-white">Education</h2>
         <div className="space-y-4">
-          {resume.education.map((edu, index) => (
+          {resume.education.map((edu) => (
             <motion.div 
-              key={edu.id}
+              key={edu._id?.toString() || `edu-${edu.university}-${edu.year}`}
               className="bg-gray-800 p-6 rounded-lg"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 + (index * 0.1) }}
+              transition={{ delay: 0.4 }}
             >
               <h3 className="text-xl font-medium text-white">{edu.degree}</h3>
               <p className="text-gray-400 mb-2">{edu.university}, {edu.year}</p>
@@ -141,9 +141,9 @@ export default function Resume() {
                 <div>
                   <p className="text-white mb-2">Relevant Coursework:</p>
                   <div className="flex flex-wrap gap-2">
-                    {edu.courses.map((course, i) => (
+                    {edu.courses.map((course, courseIndex) => (
                       <span 
-                        key={i}
+                        key={`${edu._id}-course-${courseIndex}`}
                         className="bg-blue-500 bg-opacity-20 text-blue-300 px-3 py-1 rounded-full text-sm"
                       >
                         {course}
@@ -164,19 +164,22 @@ export default function Resume() {
       >
         <h2 className="text-2xl font-semibold mb-4 text-white">Professional Experience</h2>
         <div className="space-y-4">
-          {resume.experience.map((exp, index) => (
+          {resume.experience.map((exp) => (
             <motion.div 
-              key={exp.id}
+              key={exp._id?.toString() || `exp-${exp.company}-${exp.period}`}
               className="bg-gray-800 p-6 rounded-lg"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5 + (index * 0.1) }}
+              transition={{ delay: 0.5 }}
             >
               <h3 className="text-xl font-medium text-white">{exp.title}</h3>
               <p className="text-gray-400 mb-2">{exp.company}, {exp.period}</p>
               <ul className="list-disc list-inside space-y-1">
-                {exp.achievements.map((achievement, i) => (
-                  <li key={i} className="text-gray-300">
+                {exp.achievements.map((achievement, achievementIndex) => (
+                  <li 
+                    key={`${exp._id}-achievement-${achievementIndex}`}
+                    className="text-gray-300"
+                  >
                     {achievement}
                   </li>
                 ))}

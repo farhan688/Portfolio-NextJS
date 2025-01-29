@@ -1,69 +1,145 @@
 import { NextResponse } from "next/server"
 import { Experience } from "@/app/types"
-import fs from "fs/promises"
-import path from "path"
+import { MongoClient, ObjectId } from 'mongodb'
 
-const dataFile = path.join(process.cwd(), "data", "experience.json")
-
-async function readData(): Promise<Experience[]> {
-  try {
-    const data = await fs.readFile(dataFile, "utf-8")
-    return JSON.parse(data)
-  } catch (error) {
-    return []
-  }
+if (!process.env.MONGODB_URI) {
+  throw new Error('MONGODB_URI environment variable is not defined')
 }
 
-async function writeData(data: Experience[]): Promise<void> {
-  await fs.writeFile(dataFile, JSON.stringify(data, null, 2))
-}
+const client = new MongoClient(process.env.MONGODB_URI)
 
 export async function GET() {
-  const data = await readData()
-  return NextResponse.json(data)
+  try {
+    await client.connect()
+    const db = client.db('portfolio')
+    const experiences = await db.collection('experience').find({}).toArray()
+    
+    return NextResponse.json(experiences.map(exp => ({
+      ...exp,
+      _id: exp._id.toString()
+    })))
+  } catch (error) {
+    console.error('Fetch error:', error)
+    return NextResponse.json({ error: 'Failed to fetch experiences' }, { status: 500 })
+  } finally {
+    await client.close()
+  }
 }
 
 export async function POST(request: Request) {
-  const exp = await request.json()
-  const experiences = await readData()
-  
-  const newExperience = {
-    ...exp,
-    id: Date.now().toString(),
+  try {
+    const experience = await request.json()
+    await client.connect()
+    const db = client.db('portfolio')
+    
+    const result = await db.collection('experience').insertOne({
+      ...experience,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    })
+    
+    return NextResponse.json({
+      ...experience,
+      _id: result.insertedId.toString()
+    })
+  } catch (error) {
+    console.error('Create error:', error)
+    return NextResponse.json({ error: 'Failed to create experience' }, { status: 500 })
+  } finally {
+    await client.close()
   }
-  
-  experiences.push(newExperience)
-  await writeData(experiences)
-  
-  return NextResponse.json(newExperience)
 }
 
 export async function PUT(request: Request) {
-  const exp = await request.json()
-  const experiences = await readData()
-  
-  const index = experiences.findIndex((e) => e.id === exp.id)
-  if (index === -1) {
-    return NextResponse.json({ error: "Experience not found" }, { status: 404 })
+  try {
+    const experience = await request.json() as Experience & { _id: string }
+    
+    if (!experience._id) {
+      return NextResponse.json({ error: "ID diperlukan untuk update" }, { status: 400 })
+    }
+
+    await client.connect()
+    const db = client.db('portfolio')
+    
+    const { _id, ...updateData } = experience
+    
+    // Cek apakah dokumen ada sebelum update
+    const existingExp = await db.collection('experience').findOne({ 
+      _id: new ObjectId(_id) 
+    })
+
+    if (!existingExp) {
+      return NextResponse.json({ error: "Experience not found" }, { status: 404 })
+    }
+
+    // Gunakan updateOne sebagai gantinya
+    const result = await db.collection('experience').updateOne(
+      { _id: new ObjectId(_id) },
+      { 
+        $set: {
+          ...updateData,
+          updatedAt: new Date()
+        } 
+      }
+    )
+    
+    if (result.modifiedCount === 0) {
+      throw new Error('Update operation failed')
+    }
+
+    // Ambil dokumen yang sudah diupdate
+    const updatedDoc = await db.collection('experience').findOne({ 
+      _id: new ObjectId(_id) 
+    })
+
+    if (!updatedDoc) {
+      throw new Error('Failed to fetch updated document')
+    }
+
+    // Format response
+    const updatedExperience = {
+      ...updatedDoc,
+      _id: updatedDoc._id.toString()
+    }
+
+    return NextResponse.json(updatedExperience)
+  } catch (error) {
+    console.error('Update error:', error)
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : 'Gagal mengupdate pengalaman' 
+    }, { status: 500 })
+  } finally {
+    await client.close()
   }
-  
-  experiences[index] = exp
-  await writeData(experiences)
-  
-  return NextResponse.json(exp)
 }
 
 export async function DELETE(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const id = searchParams.get("id")
-  
-  if (!id) {
-    return NextResponse.json({ error: "ID is required" }, { status: 400 })
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    
+    if (!id) {
+      return NextResponse.json({ error: 'ID pengalaman diperlukan' }, { status: 400 })
+    }
+    
+    await client.connect()
+    const db = client.db('portfolio')
+    
+    const result = await db.collection('experience').deleteOne({ 
+      _id: new ObjectId(id) 
+    })
+    
+    if (result.deletedCount === 0) {
+      return NextResponse.json({ error: "Pengalaman tidak ditemukan" }, { status: 404 })
+    }
+    
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Delete error:', error)
+    return NextResponse.json({ 
+      error: 'Gagal menghapus pengalaman'
+    }, { status: 500 })
+  } finally {
+    await client.close()
   }
-  
-  const experiences = await readData()
-  const filtered = experiences.filter((e) => e.id !== id)
-  await writeData(filtered)
-  
-  return NextResponse.json({ success: true })
 } 

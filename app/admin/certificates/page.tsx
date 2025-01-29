@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Certificate } from "@/app/types"
+import type { Certificate } from "@/app/types"
 
 export default function AdminCertificates() {
   const [certificates, setCertificates] = useState<Certificate[]>([])
@@ -11,15 +11,26 @@ export default function AdminCertificates() {
     organization: "",
     date: "",
     credentialUrl: "",
-    imageUrl: "",
+    imageUrl: ""
   })
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState<string>("")
 
   useEffect(() => {
     fetchCertificates()
   }, [])
+
+  const showSuccess = (message: string) => {
+    setSuccessMessage(message)
+    setSuccess(true)
+    setTimeout(() => {
+      setSuccess(false)
+      setSuccessMessage("")
+    }, 3000)
+  }
 
   async function fetchCertificates() {
     try {
@@ -36,11 +47,12 @@ export default function AdminCertificates() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
+    
     try {
-      const url = isEditing ? "/api/certificates" : "/api/certificates"
       const method = isEditing ? "PUT" : "POST"
       
-      const response = await fetch(url, {
+      const response = await fetch("/api/certificates", {
         method,
         headers: {
           "Content-Type": "application/json",
@@ -48,34 +60,54 @@ export default function AdminCertificates() {
         body: JSON.stringify(formData),
       })
 
-      if (!response.ok) throw new Error("Failed to save certificate")
-      
+      const responseData = await response.json()
+
+      if (!response.ok) {
+        throw new Error(responseData.error || "Failed to save certificate")
+      }
+
       await fetchCertificates()
       resetForm()
+      showSuccess(isEditing ? "Certificate updated successfully!" : "New certificate added successfully!")
     } catch (err) {
+      console.error('Submit error:', err)
       setError(err instanceof Error ? err.message : "Failed to save")
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this certificate?")) return
+  const handleEdit = (cert: Certificate) => {
+    setFormData({
+      _id: cert._id?.toString(),
+      title: cert.title || "",
+      organization: cert.organization || "",
+      date: cert.date || "",
+      credentialUrl: cert.credentialUrl || "",
+      imageUrl: cert.imageUrl || ""
+    })
+    setIsEditing(true)
+    setError(null)
+  }
+
+  const handleDelete = async (id?: string) => {
+    if (!id || !confirm("Are you sure you want to delete this certificate?")) return
     
     try {
       const response = await fetch(`/api/certificates?id=${id}`, {
         method: "DELETE",
       })
       
-      if (!response.ok) throw new Error("Failed to delete certificate")
+      const responseData = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(responseData.error || "Failed to delete certificate")
+      }
       
       await fetchCertificates()
+      showSuccess("Certificate deleted successfully!")
     } catch (err) {
+      console.error('Delete error:', err)
       setError(err instanceof Error ? err.message : "Failed to delete")
     }
-  }
-
-  const handleEdit = (cert: Certificate) => {
-    setFormData(cert)
-    setIsEditing(true)
   }
 
   const resetForm = () => {
@@ -84,7 +116,7 @@ export default function AdminCertificates() {
       organization: "",
       date: "",
       credentialUrl: "",
-      imageUrl: "",
+      imageUrl: ""
     })
     setIsEditing(false)
   }
@@ -156,7 +188,7 @@ export default function AdminCertificates() {
         <div className="space-y-4">
           {certificates.map((cert) => (
             <motion.div
-              key={cert.id}
+              key={cert._id?.toString() || `cert-${cert.title}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="bg-gray-800 p-4 rounded-lg flex justify-between items-center"
@@ -173,7 +205,7 @@ export default function AdminCertificates() {
                   Edit
                 </button>
                 <button
-                  onClick={() => handleDelete(cert.id)}
+                  onClick={() => handleDelete(cert._id?.toString())}
                   className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
                 >
                   Delete
@@ -182,6 +214,18 @@ export default function AdminCertificates() {
             </motion.div>
           ))}
         </div>
+
+        {error && (
+          <div className="bg-red-500 text-white p-4 rounded-lg mb-4">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-500 text-white p-4 rounded-lg mb-4">
+            {successMessage}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -2,20 +2,21 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Experience } from "@/app/types"
+import type { Experience } from "@/app/types"
 
 export default function AdminExperience() {
   const [experiences, setExperiences] = useState<Experience[]>([])
   const [formData, setFormData] = useState<Partial<Experience>>({
     title: "",
-    company: "",
+    company: "", 
     period: "",
-    achievements: [],
+    achievements: []
   })
   const [achievementInput, setAchievementInput] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
 
   useEffect(() => {
     fetchExperiences()
@@ -36,46 +37,79 @@ export default function AdminExperience() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
+    
     try {
-      const url = isEditing ? "/api/experience" : "/api/experience"
       const method = isEditing ? "PUT" : "POST"
       
-      const response = await fetch(url, {
+      // Pastikan _id terkirim saat update
+      const dataToSend = isEditing 
+        ? formData 
+        : {
+            title: formData.title || "",
+            company: formData.company || "",
+            period: formData.period || "",
+            achievements: formData.achievements || []
+          }
+
+      console.log('Sending data:', dataToSend)
+
+      const response = await fetch("/api/experience", {
         method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dataToSend),
       })
 
-      if (!response.ok) throw new Error("Failed to save experience")
-      
+      const responseData = await response.json()
+
+      if (!response.ok) {
+        throw new Error(responseData.error || "Failed to save experience")
+      }
+
       await fetchExperiences()
       resetForm()
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
+      console.error('Submit error:', err)
       setError(err instanceof Error ? err.message : "Failed to save")
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this experience?")) return
+  const handleEdit = (exp: Experience) => {
+    if (!exp._id) return;
+    setFormData({
+      _id: exp._id,
+      title: exp.title || "",
+      company: exp.company || "",
+      period: exp.period || "",
+      achievements: Array.isArray(exp.achievements) ? [...exp.achievements] : []
+    })
+    setIsEditing(true)
+    setError(null)
+  }
+
+  const handleDelete = async (id: string | undefined) => {
+    if (!id) return;
+    if (!confirm("Apakah Anda yakin ingin menghapus pengalaman kerja ini? Tindakan ini tidak dapat dibatalkan.")) {
+      return;
+    }
     
     try {
       const response = await fetch(`/api/experience?id=${id}`, {
         method: "DELETE",
       })
       
-      if (!response.ok) throw new Error("Failed to delete experience")
+      if (!response.ok) throw new Error("Gagal menghapus pengalaman")
       
       await fetchExperiences()
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete")
+      setError(err instanceof Error ? err.message : "Gagal menghapus")
     }
-  }
-
-  const handleEdit = (exp: Experience) => {
-    setFormData(exp)
-    setIsEditing(true)
   }
 
   const resetForm = () => {
@@ -83,33 +117,13 @@ export default function AdminExperience() {
       title: "",
       company: "",
       period: "",
-      achievements: [],
+      achievements: []
     })
-    setAchievementInput("")
     setIsEditing(false)
-  }
-
-  const handleAddAchievement = () => {
-    if (achievementInput.trim() && formData.achievements) {
-      setFormData({
-        ...formData,
-        achievements: [...formData.achievements, achievementInput.trim()]
-      })
-      setAchievementInput("")
-    }
-  }
-
-  const handleRemoveAchievement = (index: number) => {
-    if (formData.achievements) {
-      setFormData({
-        ...formData,
-        achievements: formData.achievements.filter((_, i) => i !== index)
-      })
-    }
+    setAchievementInput("")
   }
 
   if (loading) return <div className="text-center p-8">Loading...</div>
-  if (error) return <div className="text-center text-red-500 p-8">{error}</div>
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
@@ -124,12 +138,20 @@ export default function AdminExperience() {
           </button>
         </div>
 
-        {/* Form */}
+        {error && (
+          <div className="bg-red-500 text-white p-4 rounded-lg mb-4">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-500 text-white p-4 rounded-lg mb-4">
+            Experience saved successfully!
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg mb-8">
-          <h2 className="text-xl font-semibold mb-4">
-            {isEditing ? "Edit Experience" : "Add New Experience"}
-          </h2>
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <input
               type="text"
               placeholder="Job Title"
@@ -154,82 +176,74 @@ export default function AdminExperience() {
               className="bg-gray-700 p-2 rounded"
               required
             />
-            <div>
-              <div className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  placeholder="Add Achievement"
-                  value={achievementInput}
-                  onChange={(e) => setAchievementInput(e.target.value)}
-                  className="bg-gray-700 p-2 rounded flex-1"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddAchievement}
-                  className="bg-blue-600 px-4 rounded hover:bg-blue-700"
-                >
-                  Add
-                </button>
-              </div>
-              <div className="space-y-2">
-                {formData.achievements?.map((achievement, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between bg-gray-700 p-2 rounded"
-                  >
-                    <span>{achievement}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAchievement(index)}
-                      className="text-red-400 hover:text-red-300"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
-          <div className="mt-4 flex gap-2">
-            <button
-              type="submit"
-              className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
-            >
-              {isEditing ? "Update Experience" : "Add Experience"}
-            </button>
-            {isEditing && (
+
+          <div className="mb-4">
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                placeholder="Add Achievement"
+                value={achievementInput}
+                onChange={(e) => setAchievementInput(e.target.value)}
+                className="flex-1 bg-gray-700 p-2 rounded"
+              />
               <button
                 type="button"
-                onClick={resetForm}
-                className="bg-gray-600 px-4 py-2 rounded hover:bg-gray-700"
+                onClick={() => {
+                  if (achievementInput.trim()) {
+                    setFormData({
+                      ...formData,
+                      achievements: [...(formData.achievements || []), achievementInput.trim()]
+                    })
+                    setAchievementInput("")
+                  }
+                }}
+                className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
               >
-                Cancel
+                Add
               </button>
-            )}
+            </div>
+
+            <div className="space-y-2">
+              {formData.achievements?.map((achievement, index) => (
+                <div key={index} className="flex items-center gap-2 bg-gray-700 p-2 rounded">
+                  <span className="flex-1">{achievement}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({
+                      ...formData,
+                      achievements: formData.achievements?.filter((_, i) => i !== index)
+                    })}
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
+
+          <button
+            type="submit"
+            className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
+          >
+            {isEditing ? "Update Experience" : "Add Experience"}
+          </button>
         </form>
 
-        {/* Experience List */}
         <div className="space-y-4">
           {experiences.map((exp) => (
             <motion.div
-              key={exp.id}
+              key={exp._id?.toString()}
+              className="bg-gray-800 p-6 rounded-lg"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="bg-gray-800 p-4 rounded-lg"
             >
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="font-semibold text-xl">{exp.title}</h3>
+                  <h3 className="text-xl font-semibold">{exp.title}</h3>
                   <p className="text-gray-400">{exp.company}</p>
                   <p className="text-gray-500">{exp.period}</p>
-                  <ul className="list-disc list-inside mt-2 space-y-1">
-                    {exp.achievements.map((achievement, index) => (
-                      <li key={index} className="text-gray-400">
-                        {achievement}
-                      </li>
-                    ))}
-                  </ul>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -239,13 +253,20 @@ export default function AdminExperience() {
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDelete(exp.id)}
+                    onClick={() => exp._id && handleDelete(exp._id.toString())}
                     className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
                   >
                     Delete
                   </button>
                 </div>
               </div>
+              <ul className="list-disc list-inside space-y-1">
+                {exp.achievements.map((achievement, index) => (
+                  <li key={index} className="text-gray-300">
+                    {achievement}
+                  </li>
+                ))}
+              </ul>
             </motion.div>
           ))}
         </div>

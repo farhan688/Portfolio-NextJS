@@ -40,7 +40,7 @@ export default function Admin() {
       title: "Contact",
       icon: <Mail className="w-6 h-6" />,
       href: "/admin/contact",
-      description: "Update your contact information"
+      description: "See message from your visitors"
     }
   ]
 

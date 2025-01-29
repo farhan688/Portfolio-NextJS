@@ -59,7 +59,7 @@ export default function Experience() {
         <div className="space-y-8">
           {experiences.map((exp, index) => (
             <motion.div 
-              key={exp.id} 
+              key={exp._id?.toString() || `exp-${exp.company}-${index}`}
               className="bg-gray-800 rounded-lg p-6 shadow-lg"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -74,13 +74,13 @@ export default function Experience() {
               <p className="text-xl text-gray-400 mb-2">{exp.company}</p>
               <p className="text-gray-500 mb-4">{exp.period}</p>
               <ul className="list-disc list-inside space-y-2">
-                {exp.achievements.map((achievement, i) => (
+                {exp.achievements.map((achievement: string, achievementIndex: number) => (
                   <motion.li 
-                    key={i} 
+                    key={`${exp._id?.toString() || index}-achievement-${achievementIndex}`}
                     className="text-gray-300"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: (index * 0.1) + (i * 0.05) }}
+                    transition={{ delay: (index * 0.1) + (achievementIndex * 0.05) }}
                   >
                     {achievement}
                   </motion.li>

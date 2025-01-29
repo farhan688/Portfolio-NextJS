@@ -1,24 +1,30 @@
+import { ObjectId } from 'mongodb'
+
 export interface Certificate {
-  id: string
+  _id?: ObjectId | string
   title: string
   organization: string
   date: string
   credentialUrl: string
   imageUrl: string
+  createdAt?: Date
+  updatedAt?: Date
 }
 
 export interface Project {
-  id: string
+  _id?: ObjectId | string
   title: string
   description: string
   techStack: string[]
   imageUrl: string
   demoUrl?: string
   repoUrl?: string
+  createdAt?: Date
+  updatedAt?: Date
 }
 
 export interface Experience {
-  id: string
+  _id?: string | ObjectId
   title: string
   company: string
   period: string
@@ -26,13 +32,15 @@ export interface Experience {
 }
 
 export interface Skill {
-  id: string
+  _id?: ObjectId | string
   category: string
   items: string[]
+  createdAt?: Date
+  updatedAt?: Date
 }
 
 export interface About {
-  id: string
+  _id?: ObjectId | string
   title: string
   description: string
   imageUrl?: string
@@ -42,10 +50,12 @@ export interface About {
     twitter?: string
     email?: string
   }
+  createdAt?: Date
+  updatedAt?: Date
 }
 
 export interface Resume {
-  id: string
+  _id?: ObjectId | string
   personalInfo: {
     name: string
     email: string
@@ -54,27 +64,30 @@ export interface Resume {
   }
   summary: string
   education: {
-    id: string
+    _id?: ObjectId | string
     degree: string
     university: string
     year: string
     courses: string[]
   }[]
   experience: {
-    id: string
+    _id?: ObjectId | string
     title: string
     company: string
     period: string
     achievements: string[]
   }[]
   pdfUrl: string
+  createdAt?: Date
+  updatedAt?: Date
 }
 
 export interface ContactMessage {
-  id: string
+  _id?: ObjectId | string
   name: string
   email: string
   phone: string
   message: string
-  date: string
+  createdAt?: Date
+  updatedAt?: Date
 } 

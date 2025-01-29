@@ -60,7 +60,7 @@ export default function Skills() {
         <div className="space-y-12">
           {skills.map((skill, index) => (
             <motion.div
-              key={skill.id}
+              key={skill._id?.toString() || `skill-${skill.category}-${index}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
@@ -76,7 +76,7 @@ export default function Skills() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-y-4">
                 {skill.items.map((item, i) => (
                   <motion.div
-                    key={i}
+                    key={`${skill._id?.toString() || skill.category}-item-${i}`}
                     className="flex items-center gap-2"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}

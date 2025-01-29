@@ -3,14 +3,16 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import type { Resume } from "@/app/types"
+import { ObjectId } from "mongodb"
 
 export default function AdminResume() {
   const [formData, setFormData] = useState<Resume>({
-    id: "1",
+    _id: undefined,
     personalInfo: {
       name: "",
-      email: "",
-      location: ""
+      email: "", 
+      location: "",
+      linkedin: ""
     },
     summary: "",
     education: [],
@@ -54,20 +56,57 @@ export default function AdminResume() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null) // Reset error state
+    
     try {
+      const dataToSend = {
+        ...formData,
+        _id: formData._id || undefined,
+        personalInfo: {
+          name: formData.personalInfo?.name || "",
+          email: formData.personalInfo?.email || "",
+          location: formData.personalInfo?.location || "",
+          linkedin: formData.personalInfo?.linkedin || ""
+        },
+        summary: formData.summary || "",
+        education: (formData.education || []).map(edu => ({
+          ...edu,
+          _id: edu._id || undefined,
+          degree: edu.degree || "",
+          university: edu.university || "",
+          year: edu.year || "",
+          courses: Array.isArray(edu.courses) ? edu.courses : []
+        })),
+        experience: (formData.experience || []).map(exp => ({
+          ...exp,
+          _id: exp._id || undefined,
+          title: exp.title || "",
+          company: exp.company || "",
+          period: exp.period || "",
+          achievements: Array.isArray(exp.achievements) ? exp.achievements : []
+        })),
+        pdfUrl: formData.pdfUrl || ""
+      }
+
       const response = await fetch("/api/resume", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dataToSend),
       })
 
-      if (!response.ok) throw new Error("Failed to save resume")
+      const responseData = await response.json()
+
+      if (!response.ok) {
+        throw new Error(responseData.error || "Failed to save resume")
+      }
       
+      setFormData(responseData)
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
+      console.error('Submit error:', err)
       setError(err instanceof Error ? err.message : "Failed to save")
     }
   }
@@ -80,7 +119,7 @@ export default function AdminResume() {
           ...formData.education,
           {
             ...newEducation,
-            id: Date.now().toString(),
+            _id: undefined,
             courses: [...newEducation.courses]
           }
         ]
@@ -102,7 +141,7 @@ export default function AdminResume() {
           ...formData.experience,
           {
             ...newExperience,
-            id: Date.now().toString(),
+            _id: undefined,
             achievements: [...newExperience.achievements]
           }
         ]
@@ -116,17 +155,21 @@ export default function AdminResume() {
     }
   }
 
-  const removeEducation = (id: string) => {
+  const removeEducation = (id: string | ObjectId | undefined) => {
+    if (!id) return;
+    if (!confirm("Apakah Anda yakin ingin menghapus pendidikan ini?")) return;
     setFormData({
       ...formData,
-      education: formData.education.filter(edu => edu.id !== id)
+      education: formData.education.filter(edu => edu._id !== id)
     })
   }
 
-  const removeExperience = (id: string) => {
+  const removeExperience = (id: string | ObjectId | undefined) => {
+    if (!id) return;
+    if (!confirm("Apakah Anda yakin ingin menghapus pengalaman ini?")) return;
     setFormData({
       ...formData,
-      experience: formData.experience.filter(exp => exp.id !== id)
+      experience: formData.experience.filter(exp => exp._id !== id)
     })
   }
 
@@ -206,7 +249,7 @@ export default function AdminResume() {
             <h2 className="text-xl font-semibold mb-4">Education</h2>
             <div className="space-y-4 mb-4">
               {formData.education.map((edu) => (
-                <div key={edu.id} className="bg-gray-700 p-4 rounded">
+                <div key={edu._id?.toString()} className="bg-gray-700 p-4 rounded">
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold">{edu.degree}</h3>
@@ -221,7 +264,7 @@ export default function AdminResume() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => removeEducation(edu.id)}
+                      onClick={() => removeEducation(edu._id)}
                       className="text-red-400 hover:text-red-300"
                     >
                       Remove
@@ -313,7 +356,7 @@ export default function AdminResume() {
             <h2 className="text-xl font-semibold mb-4">Professional Experience</h2>
             <div className="space-y-4 mb-4">
               {formData.experience.map((exp) => (
-                <div key={exp.id} className="bg-gray-700 p-4 rounded">
+                <div key={exp._id?.toString()} className="bg-gray-700 p-4 rounded">
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold">{exp.title}</h3>
@@ -328,7 +371,7 @@ export default function AdminResume() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => removeExperience(exp.id)}
+                      onClick={() => removeExperience(exp._id)}
                       className="text-red-400 hover:text-red-300"
                     >
                       Remove
