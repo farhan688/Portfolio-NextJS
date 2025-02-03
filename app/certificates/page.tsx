@@ -10,6 +10,8 @@ export default function Certificates() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const certificatesPerPage = 8
 
   useEffect(() => {
     async function fetchCertificates() {
@@ -47,11 +49,21 @@ export default function Certificates() {
     )
   }
 
+  const totalPages = Math.ceil(certificates.length / certificatesPerPage)
+  const indexOfLastCert = currentPage * certificatesPerPage
+  const indexOfFirstCert = indexOfLastCert - certificatesPerPage
+  const currentCertificates = certificates.slice(indexOfFirstCert, indexOfLastCert)
+
+  const pageNumbers = []
+  for (let i = 1; i <= totalPages; i++) {
+    pageNumbers.push(i)
+  }
+
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto pb-10">
       <h1 className="text-3xl font-bold mb-6 text-white">Certificates</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {certificates.map((cert) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {currentCertificates.map((cert) => (
           <motion.div
             key={cert._id?.toString() || `cert-${cert.title}-${cert.organization}`}
             initial={{ opacity: 0, y: 20 }}
@@ -84,6 +96,48 @@ export default function Certificates() {
           </motion.div>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className={`px-4 py-2 rounded ${
+              currentPage === 1 
+                ? 'bg-gray-600 cursor-not-allowed' 
+                : 'bg-blue-600 hover:bg-blue-700'
+            } text-white`}
+          >
+            Prev
+          </button>
+
+          {pageNumbers.map(number => (
+            <button
+              key={number}
+              onClick={() => setCurrentPage(number)}
+              className={`px-4 py-2 rounded ${
+                currentPage === number
+                  ? 'bg-blue-600'
+                  : 'bg-gray-700 hover:bg-gray-600'
+              } text-white`}
+            >
+              {number}
+            </button>
+          ))}
+
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            className={`px-4 py-2 rounded ${
+              currentPage === totalPages
+                ? 'bg-gray-600 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700'
+            } text-white`}
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       <AnimatePresence>
         {selectedImage && (
