@@ -18,6 +18,8 @@ export default function AdminProjects() {
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string>("")
 
   useEffect(() => {
     fetchProjects()
@@ -36,24 +38,43 @@ export default function AdminProjects() {
     }
   }
 
+  const showSuccessMessage = (message: string) => {
+    setSuccessMessage(message)
+    setTimeout(() => setSuccessMessage(""), 3000) // Hide after 3 seconds
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const url = isEditing ? "/api/projects" : "/api/projects"
+      const formDataToSend = new FormData()
+      formDataToSend.append('title', formData.title || '')
+      formDataToSend.append('description', formData.description || '')
+      formDataToSend.append('techStack', JSON.stringify(formData.techStack || []))
+      formDataToSend.append('demoUrl', formData.demoUrl || '')
+      formDataToSend.append('repoUrl', formData.repoUrl || '')
+      formDataToSend.append('imageUrl', formData.imageUrl || '')
+
+      if (selectedFile) {
+        formDataToSend.append('image', selectedFile)
+      }
+
+      if (isEditing && formData._id) {
+        formDataToSend.append('_id', formData._id.toString())
+      }
+
+      const url = "/api/projects"
       const method = isEditing ? "PUT" : "POST"
       
       const response = await fetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
+        body: formDataToSend,
       })
 
       if (!response.ok) throw new Error("Failed to save project")
       
       await fetchProjects()
       resetForm()
+      showSuccessMessage(isEditing ? "Project updated successfully!" : "Project created successfully!")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save")
     }
@@ -70,6 +91,7 @@ export default function AdminProjects() {
       if (!response.ok) throw new Error("Failed to delete project")
       
       await fetchProjects()
+      showSuccessMessage("Project deleted successfully!")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete")
     }
@@ -91,6 +113,7 @@ export default function AdminProjects() {
     })
     setTechInput("")
     setIsEditing(false)
+    setSelectedFile(null)
   }
 
   const handleAddTech = () => {
@@ -118,6 +141,24 @@ export default function AdminProjects() {
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
       <div className="max-w-4xl mx-auto">
+        {/* Add success message display */}
+        {successMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="bg-green-500 text-white p-4 rounded-lg mb-4 flex justify-between items-center"
+          >
+            <span>{successMessage}</span>
+            <button 
+              onClick={() => setSuccessMessage("")}
+              className="text-white hover:text-green-200"
+            >
+              ×
+            </button>
+          </motion.div>
+        )}
+
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Manage Projects</h1>
           <button
@@ -182,13 +223,25 @@ export default function AdminProjects() {
                 ))}
               </div>
             </div>
-            <input
-              type="url"
-              placeholder="Image URL"
-              value={formData.imageUrl}
-              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-              className="bg-gray-700 p-2 rounded"
-            />
+            <div>
+              <label className="block mb-2">Upload Image (JPEG/PNG)</label>
+              <input
+                type="file"
+                accept="image/jpeg, image/png"
+                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                className="bg-gray-700 p-2 rounded w-full"
+              />
+              {formData.imageUrl && (
+                <div className="mt-2">
+                  <p className="text-sm text-gray-400 mb-2">Current image:</p>
+                  <img 
+                    src={formData.imageUrl} 
+                    alt="Project preview" 
+                    className="max-w-xs rounded"
+                  />
+                </div>
+              )}
+            </div>
             <input
               type="url"
               placeholder="Demo URL"
@@ -268,4 +321,4 @@ export default function AdminProjects() {
       </div>
     </div>
   )
-} 
+}

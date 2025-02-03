@@ -29,18 +29,44 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const project = await request.json()
+    const formData = await request.formData()
+    
+    const title = formData.get('title') as string
+    const description = formData.get('description') as string
+    const techStack = JSON.parse(formData.get('techStack') as string)
+    const demoUrl = formData.get('demoUrl') as string
+    const repoUrl = formData.get('repoUrl') as string
+    const imageFile = formData.get('image') as File | null
+
+    let imageUrl = ''
+
+    if (imageFile) {
+      const arrayBuffer = await imageFile.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
+      imageUrl = `data:${imageFile.type};base64,${buffer.toString('base64')}`
+    }
+
     await client.connect()
     const db = client.db('portfolio')
     
     const result = await db.collection('projects').insertOne({
-      ...project,
+      title,
+      description,
+      techStack,
+      imageUrl,
+      demoUrl,
+      repoUrl,
       createdAt: new Date()
     })
     
     return NextResponse.json({ 
-      ...project, 
-      _id: result.insertedId 
+      title,
+      description,
+      techStack,
+      imageUrl,
+      demoUrl,
+      repoUrl,
+      _id: result.insertedId.toString()
     })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to create project' }, { status: 500 })
@@ -51,20 +77,56 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const project = await request.json()
+    const formData = await request.formData()
+    
+    const title = formData.get('title') as string
+    const description = formData.get('description') as string
+    const techStack = JSON.parse(formData.get('techStack') as string)
+    const demoUrl = formData.get('demoUrl') as string
+    const repoUrl = formData.get('repoUrl') as string
+    const imageFile = formData.get('image') as File | null
+    const existingImageUrl = formData.get('imageUrl') as string
+    const _id = formData.get('_id') as string
+
+    let imageUrl = existingImageUrl
+
+    if (imageFile) {
+      const arrayBuffer = await imageFile.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
+      imageUrl = `data:${imageFile.type};base64,${buffer.toString('base64')}`
+    }
+
     await client.connect()
     const db = client.db('portfolio')
     
     const result = await db.collection('projects').updateOne(
-      { _id: new ObjectId(project._id) },
-      { $set: { ...project, updatedAt: new Date() } }
+      { _id: new ObjectId(_id) },
+      { 
+        $set: { 
+          title,
+          description,
+          techStack,
+          imageUrl,
+          demoUrl,
+          repoUrl,
+          updatedAt: new Date()
+        } 
+      }
     )
     
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 })
     }
     
-    return NextResponse.json(project)
+    return NextResponse.json({
+      _id,
+      title,
+      description,
+      techStack,
+      imageUrl,
+      demoUrl,
+      repoUrl
+    })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to update project' }, { status: 500 })
   } finally {
@@ -98,4 +160,4 @@ export async function DELETE(request: Request) {
   } finally {
     await client.close()
   }
-} 
+}
