@@ -7,6 +7,9 @@ export interface Certificate {
   date: string
   credentialUrl: string
   imageUrl: string
+  file?: File | null
+  fileName?: string
+  fileType?: string
   createdAt?: Date
   updatedAt?: Date
 }
@@ -90,4 +93,4 @@ export interface ContactMessage {
   message: string
   createdAt?: Date
   updatedAt?: Date
-} 
+}
