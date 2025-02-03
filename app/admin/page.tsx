@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { FileText, Briefcase, Award, User, Code, Mail } from "lucide-react"
+import { FileText, Briefcase, Award, User, Code, Mail, FolderGit2 } from "lucide-react"
 
 export default function Admin() {
   const menuItems = [
@@ -41,6 +41,12 @@ export default function Admin() {
       icon: <Mail className="w-6 h-6" />,
       href: "/admin/contact",
       description: "See message from your visitors"
+    },
+    {
+      title: "Projects",
+      icon: <FolderGit2 className="w-6 h-6" />,
+      href: "/admin/projects",
+      description: "Manage your portfolio projects"
     }
   ]
 
@@ -71,4 +77,4 @@ export default function Admin() {
       </div>
     </div>
   )
-} 
+}

@@ -7,6 +7,7 @@ import type { Certificate } from "@/app/types"
 export default function AdminCertificates() {
   const [certificates, setCertificates] = useState<Certificate[]>([])
   const [formData, setFormData] = useState<Partial<Certificate>>({
+    _id: undefined,
     title: "",
     organization: "",
     date: "",
@@ -18,6 +19,7 @@ export default function AdminCertificates() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string>("")
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   useEffect(() => {
     fetchCertificates()
@@ -50,14 +52,25 @@ export default function AdminCertificates() {
     setError(null)
     
     try {
+      const formDataToSend = new FormData()
+      formDataToSend.append('title', formData.title || '')
+      formDataToSend.append('organization', formData.organization || '')
+      formDataToSend.append('date', formData.date || '')
+      formDataToSend.append('credentialUrl', formData.credentialUrl || '')
+      formDataToSend.append('imageUrl', formData.imageUrl || '')
+
+      if (selectedFile) {
+        formDataToSend.append('image', selectedFile)
+      }
+
+      if (formData._id) {
+        formDataToSend.append('_id', formData._id.toString())
+      }
+
       const method = isEditing ? "PUT" : "POST"
-      
       const response = await fetch("/api/certificates", {
         method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
+        body: formDataToSend,
       })
 
       const responseData = await response.json()
@@ -68,6 +81,7 @@ export default function AdminCertificates() {
 
       await fetchCertificates()
       resetForm()
+      setSelectedFile(null)
       showSuccess(isEditing ? "Certificate updated successfully!" : "New certificate added successfully!")
     } catch (err) {
       console.error('Submit error:', err)
@@ -139,7 +153,9 @@ export default function AdminCertificates() {
 
         {/* Form Tambah/Edit Sertifikat */}
         <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg mb-8">
-          <h2 className="text-xl font-semibold mb-4">Add New Certificate</h2>
+          <h2 className="text-xl font-semibold mb-4">
+            {isEditing ? "Edit Certificate" : "Add New Certificate"}
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
               type="text"
@@ -175,6 +191,21 @@ export default function AdminCertificates() {
               onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
               className="bg-gray-700 p-2 rounded"
             />
+            <div className="col-span-2">
+              <label className="block mb-2">Upload Image (JPEG/PNG)</label>
+              <input
+                type="file"
+                accept="image/jpeg, image/png"
+                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                className="bg-gray-700 p-2 rounded w-full"
+              />
+              {(formData.imageUrl || selectedFile) && (
+                <div className="mt-2 text-sm text-gray-400">
+                  {selectedFile ? `Selected file: ${selectedFile.name}` : 
+                    formData.imageUrl ? `Current image: ${formData.imageUrl.substring(0, 50)}...` : ''}
+                </div>
+              )}
+            </div>
           </div>
           <button
             type="submit"
@@ -229,4 +260,4 @@ export default function AdminCertificates() {
       </div>
     </div>
   )
-} 
+}

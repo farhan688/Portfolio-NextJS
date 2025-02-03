@@ -28,18 +28,42 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const certificate = await request.json()
+    const formData = await request.formData()
+    
+    const title = formData.get('title') as string
+    const organization = formData.get('organization') as string
+    const date = formData.get('date') as string
+    const credentialUrl = formData.get('credentialUrl') as string
+    const imageFile = formData.get('image') as File | null
+    const existingImageUrl = formData.get('imageUrl') as string
+
+    let imageUrl = existingImageUrl
+
+    if (imageFile) {
+      const arrayBuffer = await imageFile.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
+      imageUrl = `data:${imageFile.type};base64,${buffer.toString('base64')}`
+    }
+
     await client.connect()
     const db = client.db('portfolio')
     
     const result = await db.collection('certificates').insertOne({
-      ...certificate,
+      title,
+      organization,
+      date,
+      credentialUrl,
+      imageUrl,
       createdAt: new Date(),
       updatedAt: new Date()
     })
     
     return NextResponse.json({
-      ...certificate,
+      title,
+      organization,
+      date,
+      credentialUrl,
+      imageUrl,
       _id: result.insertedId.toString()
     })
   } catch (error) {
@@ -52,20 +76,39 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const certificate = await request.json()
+    const formData = await request.formData()
     
-    if (!certificate._id) {
-      return NextResponse.json({ error: "ID is required for update" }, { status: 400 })
+    const title = formData.get('title') as string
+    const organization = formData.get('organization') as string
+    const date = formData.get('date') as string
+    const credentialUrl = formData.get('credentialUrl') as string
+    const imageFile = formData.get('image') as File | null
+    const existingImageUrl = formData.get('imageUrl') as string
+    const _id = formData.get('_id') as string
+
+    let imageUrl = existingImageUrl
+
+    if (imageFile) {
+      const arrayBuffer = await imageFile.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
+      imageUrl = `data:${imageFile.type};base64,${buffer.toString('base64')}`
     }
 
     await client.connect()
     const db = client.db('portfolio')
     
-    const { _id, ...updateData } = certificate
+    const { _id: id, ...updateData } = {
+      title,
+      organization,
+      date,
+      credentialUrl,
+      imageUrl,
+      _id
+    }
     
     // Cek apakah dokumen ada sebelum update
     const existingCert = await db.collection('certificates').findOne({ 
-      _id: new ObjectId(_id) 
+      _id: new ObjectId(id) 
     })
 
     if (!existingCert) {
@@ -74,7 +117,7 @@ export async function PUT(request: Request) {
 
     // Update dokumen
     const result = await db.collection('certificates').updateOne(
-      { _id: new ObjectId(_id) },
+      { _id: new ObjectId(id) },
       { 
         $set: {
           ...updateData,
@@ -89,7 +132,7 @@ export async function PUT(request: Request) {
 
     // Ambil dokumen yang sudah diupdate
     const updatedDoc = await db.collection('certificates').findOne({ 
-      _id: new ObjectId(_id) 
+      _id: new ObjectId(id) 
     })
 
     if (!updatedDoc) {
@@ -145,4 +188,4 @@ export async function DELETE(request: Request) {
   } finally {
     await client.close()
   }
-} 
+}

@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Home, User, FileText, Briefcase, Code, Award, Mail } from "lucide-react"
+import { Home, User, FileText, Briefcase, Code, Award, Mail, FolderGit2 } from "lucide-react"
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false)
@@ -13,8 +13,8 @@ const Header = () => {
     { href: "/about", label: "About", icon: User },
     { href: "/resume", label: "Resume", icon: FileText },
     { href: "/experience", label: "Experience", icon: Briefcase },
-    { href: "/projects", label: "Projects", icon: Code },
-    { href: "/skills", label: "Skills", icon: Award },
+    { href: "/projects", label: "Projects", icon: FolderGit2 },
+    { href: "/skills", label: "Skills", icon: Code },
     { href: "/certificates", label: "Certificates", icon: Award },
     { href: "/contact", label: "Contact", icon: Mail },
   ]
