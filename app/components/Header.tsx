@@ -24,7 +24,7 @@ const Header = () => {
       <nav className="container mx-auto px-4 py-4">
         <div className="flex justify-between items-center">
           <Link href="/" className="text-2xl font-bold text-blue-400">
-            Farhan Aditya
+            P O R T F O L I O
           </Link>
           <div className="md:hidden">
             <button onClick={() => setIsOpen(!isOpen)} className="text-gray-300 hover:text-white">
