@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Certificate } from "@/app/types"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 
 export default function Certificates() {
   const [certificates, setCertificates] = useState<Certificate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchCertificates() {
@@ -62,7 +63,8 @@ export default function Certificates() {
               alt={`${cert.title} certificate`}
               width={100}
               height={100}
-              className="mr-4 rounded-md"
+              className="mr-4 rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setSelectedImage(cert.imageUrl)}
             />
             <div>
               <h2 className="text-xl font-semibold mb-2 text-blue-300">{cert.title}</h2>
@@ -82,6 +84,37 @@ export default function Certificates() {
           </motion.div>
         ))}
       </div>
+
+      <AnimatePresence>
+        {selectedImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedImage(null)}
+            className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"
+          >
+            <div className="relative max-w-4xl max-h-[90vh] w-full">
+              <Image
+                src={selectedImage}
+                alt="Certificate large view"
+                width={1200}
+                height={800}
+                className="w-full h-auto object-contain rounded-lg"
+                onClick={(e) => e.stopPropagation()}
+              />
+              <button
+                onClick={() => setSelectedImage(null)}
+                className="absolute top-4 right-4 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-75"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
