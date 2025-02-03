@@ -83,14 +83,14 @@ export default function Home() {
           Welcome, I&apos;m {about.title}
         </motion.h1>
 
-        <motion.p
+        {/* <motion.p
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.4 }}
           className="text-lg text-gray-300 mb-8"
         >
           {about.description}
-        </motion.p>
+        </motion.p> */}
       </div>
       <motion.div
         className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
