@@ -2,25 +2,34 @@ import { NextResponse } from "next/server"
 import { MongoClient, ObjectId } from 'mongodb'
 import twilio from 'twilio'
 
-if (!process.env.MONGODB_URI || !process.env.TWILIO_WHATSAPP_TO) {
-  throw new Error('MONGODB_URI environment variable is not defined')
+// Remove the initial connection check and move it inside each route handler
+let client: MongoClient | null = null;
+
+const getClient = () => {
+  if (!process.env.MONGODB_URI) {
+    throw new Error('MONGODB_URI environment variable is not defined')
+  }
+  if (!client) {
+    client = new MongoClient(process.env.MONGODB_URI)
+  }
+  return client
 }
 
-const client = new MongoClient(process.env.MONGODB_URI)
-
-// Initialize Twilio client
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-)
+const getTwilioClient = () => {
+  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+    throw new Error('Twilio credentials are not defined')
+  }
+  return twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN
+  )
+}
 
 export async function GET() {
+  const mongoClient = getClient()
   try {
-    if (!client.connect) {
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 })
-    }
-    await client.connect()
-    const db = client.db('portfolio')
+    await mongoClient.connect()
+    const db = mongoClient.db('portfolio')
     const messages = await db.collection('contact').find({}).toArray()
     
     const formattedMessages = messages.map(msg => ({
@@ -30,53 +39,63 @@ export async function GET() {
     }))
     
     return NextResponse.json(formattedMessages)
-  } catch (error: unknown) {
-    console.error('Database error:', error)
+  } catch (error) {
+    console.error('Error fetching messages:', error)
     return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 })
   } finally {
-    await client.close()
+    await mongoClient.close()
   }
 }
 
 export async function POST(request: Request) {
+  const mongoClient = getClient()
   try {
     const message = await request.json()
-    await client.connect()
-    const db = client.db('portfolio')
+    await mongoClient.connect()
+    const db = mongoClient.db('portfolio')
     
-    // Save to MongoDB
     const result = await db.collection('contact').insertOne({
       ...message,
       createdAt: new Date()
     })
 
-    // Send WhatsApp message
-    const whatsappMessage = `
-    New Contact Form Submission:
-    Name: ${message.name}
-    Email: ${message.email}
-    Phone: ${message.phone}
-    Message: ${message.message}
-    `.trim()
+    // Only attempt to send WhatsApp message if Twilio credentials exist
+    try {
+      if (process.env.TWILIO_WHATSAPP_FROM && process.env.TWILIO_WHATSAPP_TO) {
+        const twilioClient = getTwilioClient()
+        const whatsappMessage = `
+New Contact Form Submission:
+Name: ${message.name}
+Email: ${message.email}
+Phone: ${message.phone}
+Message: ${message.message}
+        `.trim()
 
-    await twilioClient.messages.create({
-      body: whatsappMessage,
-      from: process.env.TWILIO_WHATSAPP_FROM,
-      to: process.env.TWILIO_WHATSAPP_TO as string
-    })
+        await twilioClient.messages.create({
+          body: whatsappMessage,
+          from: process.env.TWILIO_WHATSAPP_FROM,
+          to: process.env.TWILIO_WHATSAPP_TO
+        })
+      }
+    } catch (twilioError) {
+      console.error('Twilio error:', twilioError)
+      // Continue execution even if WhatsApp message fails
+    }
+
     return NextResponse.json({ 
       ...message, 
       _id: result.insertedId 
     })
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Error saving message:', error)
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 })
   } finally {
-    await client.close()
+    await mongoClient.close()
   }
 }
 
 export async function DELETE(request: Request) {
+  const mongoClient = getClient()
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
@@ -85,8 +104,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 })
     }
     
-    await client.connect()
-    const db = client.db('portfolio')
+    await mongoClient.connect()
+    const db = mongoClient.db('portfolio')
     
     const result = await db.collection('contact').deleteOne({
       _id: new ObjectId(id)
@@ -100,6 +119,6 @@ export async function DELETE(request: Request) {
   } catch (error) {
     return NextResponse.json({ error: 'Failed to delete message' }, { status: 500 })
   } finally {
-    await client.close()
+    await mongoClient.close()
   }
 }
