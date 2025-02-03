@@ -27,6 +27,28 @@ export default function Resume() {
     fetchResume()
   }, [])
 
+  const handleDownload = async () => {
+    try {
+      const response = await fetch('/api/resume', {
+        method: 'POST',
+      })
+      
+      if (!response.ok) throw new Error('Download failed')
+      
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = resume?.pdfFileName || 'resume.pdf'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Download error:', error)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -56,17 +78,14 @@ export default function Resume() {
         >
           Resume
         </motion.h1>
-        {resume?.pdfUrl && (
+        {resume?.pdfFileData && ( // Ubah dari pdfUrl menjadi pdfFileData
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
           >
-            <Link
-              href={resume.pdfUrl}
+            <button
+              onClick={handleDownload}
               className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-300 shadow-md flex items-center gap-2"
-              download
-              target="_blank"
-              rel="noopener noreferrer"
             >
               <svg 
                 className="w-5 h-5" 
@@ -81,8 +100,8 @@ export default function Resume() {
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
               </svg>
-          Download PDF
-        </Link>
+              Download PDF
+            </button>
           </motion.div>
         )}
       </div>

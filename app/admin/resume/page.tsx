@@ -56,44 +56,27 @@ export default function AdminResume() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null) // Reset error state
+    setError(null)
     
     try {
-      const dataToSend = {
-        ...formData,
-        _id: formData._id || undefined,
-        personalInfo: {
-          name: formData.personalInfo?.name || "",
-          email: formData.personalInfo?.email || "",
-          location: formData.personalInfo?.location || "",
-          linkedin: formData.personalInfo?.linkedin || ""
-        },
-        summary: formData.summary || "",
-        education: (formData.education || []).map(edu => ({
-          ...edu,
-          _id: edu._id || undefined,
-          degree: edu.degree || "",
-          university: edu.university || "",
-          year: edu.year || "",
-          courses: Array.isArray(edu.courses) ? edu.courses : []
-        })),
-        experience: (formData.experience || []).map(exp => ({
-          ...exp,
-          _id: exp._id || undefined,
-          title: exp.title || "",
-          company: exp.company || "",
-          period: exp.period || "",
-          achievements: Array.isArray(exp.achievements) ? exp.achievements : []
-        })),
-        pdfUrl: formData.pdfUrl || ""
+      const submitFormData = new FormData()
+      
+      // Add PDF file if exists
+      if (formData.pdfFile instanceof File) {
+        submitFormData.append('pdfFile', formData.pdfFile)
       }
+
+      // Prepare resume data without the File object
+      const resumeDataToSend = {
+        ...formData,
+        pdfFile: undefined, // Remove File object
+      }
+
+      submitFormData.append('resumeData', JSON.stringify(resumeDataToSend))
 
       const response = await fetch("/api/resume", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(dataToSend),
+        body: submitFormData,
       })
 
       const responseData = await response.json()
@@ -463,21 +446,28 @@ export default function AdminResume() {
             <h2 className="text-xl font-semibold mb-4">Resume PDF</h2>
             <div className="space-y-4">
               <div>
-                <label className="block mb-2">PDF URL</label>
+                <label className="block mb-2">Upload PDF</label>
                 <input
-                  type="url"
-                  value={formData.pdfUrl || ""}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    pdfUrl: e.target.value
-                  })}
-                  placeholder="URL to your resume PDF"
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setFormData({
+                        ...formData,
+                        pdfFile: file,
+                        pdfFileName: file.name
+                      })
+                    }
+                  }}
                   className="w-full bg-gray-700 p-2 rounded"
                 />
               </div>
-              <p className="text-sm text-gray-400">
-                Upload your PDF resume to a cloud storage service and paste the URL here
-              </p>
+              {formData.pdfFileName && (
+                <p className="text-sm text-gray-400">
+                  Current file: {formData.pdfFileName}
+                </p>
+              )}
             </div>
           </section>
 
@@ -498,4 +488,4 @@ export default function AdminResume() {
       </div>
     </div>
   )
-} 
+}

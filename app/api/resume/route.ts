@@ -51,50 +51,62 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-  const resume = await request.json()
+    const formData = await request.formData()
+    const pdfFile = formData.get('pdfFile') as File | null
+    const resumeDataString = formData.get('resumeData') as string
+    
+    if (!resumeDataString) {
+      throw new Error('Resume data is missing')
+    }
+
+    const resumeData = JSON.parse(resumeDataString)
+
     await client.connect()
     const db = client.db('portfolio')
-    
-    // Persiapkan data untuk update
+
+    // Prepare update data
     const updateData = {
       personalInfo: {
-        name: resume.personalInfo?.name || "",
-        email: resume.personalInfo?.email || "",
-        location: resume.personalInfo?.location || "",
-        linkedin: resume.personalInfo?.linkedin || ""
+        name: resumeData.personalInfo?.name || "",
+        email: resumeData.personalInfo?.email || "",
+        location: resumeData.personalInfo?.location || "",
+        linkedin: resumeData.personalInfo?.linkedin || ""
       },
-      summary: resume.summary || "",
-      education: (resume.education || []).map((edu: any) => {
-        const { _id, ...rest } = edu
-        return {
-          ...rest,
-          _id: new ObjectId(), // Selalu buat ID baru
-          degree: edu.degree || "",
-          university: edu.university || "",
-          year: edu.year || "",
-          courses: Array.isArray(edu.courses) ? edu.courses : []
-        }
-      }),
-      experience: (resume.experience || []).map((exp: any) => {
-        const { _id, ...rest } = exp
-        return {
-          ...rest,
-          _id: new ObjectId(), // Selalu buat ID baru
-          title: exp.title || "",
-          company: exp.company || "",
-          period: exp.period || "",
-          achievements: Array.isArray(exp.achievements) ? exp.achievements : []
-        }
-      }),
-      pdfUrl: resume.pdfUrl || "",
+      summary: resumeData.summary || "",
+      education: Array.isArray(resumeData.education) ? resumeData.education.map((edu: any) => ({
+        ...edu,
+        _id: new ObjectId(),
+        degree: edu.degree || "",
+        university: edu.university || "",
+        year: edu.year || "",
+        courses: Array.isArray(edu.courses) ? edu.courses : []
+      })) : [],
+      experience: Array.isArray(resumeData.experience) ? resumeData.experience.map((exp: any) => ({
+        ...exp,
+        _id: new ObjectId(),
+        title: exp.title || "",
+        company: exp.company || "",
+        period: exp.period || "",
+        achievements: Array.isArray(exp.achievements) ? exp.achievements : []
+      })) : [],
       updatedAt: new Date()
     }
 
-    // Cari dokumen yang ada
+    // Handle PDF file if present
+    if (pdfFile) {
+      const buffer = await pdfFile.arrayBuffer()
+      const base64Data = Buffer.from(buffer).toString('base64')
+      Object.assign(updateData, {
+        pdfFileData: base64Data,
+        pdfFileName: pdfFile.name,
+        contentType: pdfFile.type
+      })
+    }
+
+    // Find existing document
     const existingResume = await db.collection('resume').findOne({})
-    
+
     if (!existingResume) {
-      // Buat dokumen baru
       const result = await db.collection('resume').insertOne({
         ...updateData,
         createdAt: new Date()
@@ -116,12 +128,12 @@ export async function PUT(request: Request) {
       return NextResponse.json(newResume)
     }
 
-    // Update dokumen yang ada
+    // Update existing document
     const result = await db.collection('resume').replaceOne(
       { _id: existingResume._id },
       {
         ...updateData,
-        createdAt: existingResume.createdAt // Pertahankan tanggal pembuatan asli
+        createdAt: existingResume.createdAt
       }
     )
 
@@ -129,7 +141,7 @@ export async function PUT(request: Request) {
       throw new Error('Failed to update resume')
     }
 
-    // Ambil dokumen yang sudah diupdate
+    // Fetch updated document
     const updatedResume = await db.collection('resume').findOne({ _id: existingResume._id })
     
     if (!updatedResume) {
@@ -159,4 +171,30 @@ export async function PUT(request: Request) {
   } finally {
     await client.close()
   }
-} 
+}
+
+// Add new download route handler
+export async function POST(request: Request) {
+  try {
+    await client.connect()
+    const db = client.db('portfolio')
+    const resume = await db.collection('resume').findOne({})
+
+    if (!resume || !resume.pdfFileData) {
+      return NextResponse.json({ error: 'No PDF file found' }, { status: 404 })
+    }
+
+    const buffer = Buffer.from(resume.pdfFileData, 'base64')
+
+    return new NextResponse(buffer, {
+      headers: {
+        'Content-Type': resume.contentType || 'application/pdf',
+        'Content-Disposition': `attachment; filename="${resume.pdfFileName || 'resume.pdf'}"`,
+      },
+    })
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to download PDF' }, { status: 500 })
+  } finally {
+    await client.close()
+  }
+}

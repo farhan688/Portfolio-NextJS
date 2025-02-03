@@ -80,6 +80,10 @@ export interface Resume {
     period: string
     achievements: string[]
   }[]
+  pdfFile?: File | null
+  pdfFileName?: string
+  pdfFileData?: string
+  contentType?: string
   pdfUrl: string
   createdAt?: Date
   updatedAt?: Date
