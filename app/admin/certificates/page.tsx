@@ -1,142 +1,166 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
-import type { Certificate } from "@/app/types"
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import type { Certificate } from "@/app/types";
 
 export default function AdminCertificates() {
-  const [certificates, setCertificates] = useState<Certificate[]>([])
-  const [formData, setFormData] = useState<Partial<Certificate>>({
-    _id: undefined,
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [newCertificate, setNewCertificate] = useState<Certificate>({
     title: "",
     organization: "",
-    date: "",
+    date: "", // YYYY-MM-DD format for input type="date"
     credentialUrl: "",
-    imageUrl: ""
-  })
-  const [isEditing, setIsEditing] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
-  const [successMessage, setSuccessMessage] = useState<string>("")
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    imageUrl: "",
+  });
+  const [editingCertificate, setEditingCertificate] = useState<Certificate | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    fetchCertificates()
-  }, [])
-
-  const showSuccess = (message: string) => {
-    setSuccessMessage(message)
-    setSuccess(true)
-    setTimeout(() => {
-      setSuccess(false)
-      setSuccessMessage("")
-    }, 3000)
-  }
-
-  async function fetchCertificates() {
-    try {
-      const response = await fetch("/api/certificates")
-      if (!response.ok) throw new Error("Failed to fetch certificates")
-      const data = await response.json()
-      setCertificates(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong")
-    } finally {
-      setLoading(false)
+    async function fetchCertificates() {
+      try {
+        const response = await fetch("/api/certificates");
+        if (!response.ok) throw new Error("Failed to fetch certificates");
+        const data: Certificate[] = await response.json();
+        // Format date for input type="date" (YYYY-MM-DD)
+        const formattedData = data.map(cert => ({
+          ...cert,
+          date: cert.date ? new Date(cert.date).toISOString().split('T')[0] : "",
+        }));
+        setCertificates(formattedData);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong");
+      } finally {
+        setLoading(false);
+      }
     }
-  }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    
+    fetchCertificates();
+  }, []);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedFile(e.target.files?.[0] || null);
+  };
+
+  const handleAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
-      const formDataToSend = new FormData()
-      formDataToSend.append('title', formData.title || '')
-      formDataToSend.append('organization', formData.organization || '')
-      formDataToSend.append('date', formData.date || '')
-      formDataToSend.append('credentialUrl', formData.credentialUrl || '')
-      formDataToSend.append('imageUrl', formData.imageUrl || '')
-
+      const formDataToSend = new FormData();
+      formDataToSend.append('title', newCertificate.title);
+      formDataToSend.append('organization', newCertificate.organization);
+      formDataToSend.append('date', newCertificate.date);
+      formDataToSend.append('credentialUrl', newCertificate.credentialUrl || '');
+      
       if (selectedFile) {
-        formDataToSend.append('image', selectedFile)
+        formDataToSend.append('image', selectedFile);
+      } else if (newCertificate.imageUrl) {
+        formDataToSend.append('imageUrl', newCertificate.imageUrl);
       }
 
-      if (formData._id) {
-        formDataToSend.append('_id', formData._id.toString())
-      }
-
-      const method = isEditing ? "PUT" : "POST"
-      const response = await fetch("/api/certificates", {
-        method,
+      const response = await fetch('/api/certificates', {
+        method: 'POST',
         body: formDataToSend,
-      })
-
-      const responseData = await response.json()
+      });
 
       if (!response.ok) {
-        throw new Error(responseData.error || "Failed to save certificate")
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add certificate');
       }
 
-      await fetchCertificates()
-      resetForm()
-      setSelectedFile(null)
-      showSuccess(isEditing ? "Certificate updated successfully!" : "New certificate added successfully!")
+      const addedCert: Certificate = await response.json();
+      // Format date for input type="date"
+      addedCert.date = addedCert.date ? new Date(addedCert.date).toISOString().split('T')[0] : "";
+      setCertificates([...certificates, addedCert]);
+      setNewCertificate({
+        title: "",
+        organization: "",
+        date: "",
+        credentialUrl: "",
+        imageUrl: "",
+      });
+      setSelectedFile(null);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      console.error('Submit error:', err)
-      setError(err instanceof Error ? err.message : "Failed to save")
+      console.error('Add error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to add');
     }
-  }
+  };
 
-  const handleEdit = (cert: Certificate) => {
-    setFormData({
-      _id: cert._id?.toString(),
-      title: cert.title || "",
-      organization: cert.organization || "",
-      date: cert.date || "",
-      credentialUrl: cert.credentialUrl || "",
-      imageUrl: cert.imageUrl || ""
-    })
-    setIsEditing(true)
-    setError(null)
-  }
+  const handleEditClick = (cert: Certificate) => {
+    setEditingCertificate({ ...cert });
+    setSelectedFile(null); // Clear selected file when starting edit
+  };
 
-  const handleDelete = async (id?: string) => {
-    if (!id || !confirm("Are you sure you want to delete this certificate?")) return
-    
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCertificate || !editingCertificate.id) return;
+
+    try {
+      const formDataToSend = new FormData();
+      formDataToSend.append('_id', editingCertificate.id); // Use '_id' for update to match API
+      formDataToSend.append('title', editingCertificate.title);
+      formDataToSend.append('organization', editingCertificate.organization);
+      formDataToSend.append('date', editingCertificate.date);
+      formDataToSend.append('credentialUrl', editingCertificate.credentialUrl || '');
+      formDataToSend.append('imageUrl', editingCertificate.imageUrl || ''); // Send existing image URL
+
+      if (selectedFile) {
+        formDataToSend.append('image', selectedFile);
+      }
+
+      const response = await fetch('/api/certificates', {
+        method: 'PUT',
+        body: formDataToSend,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update certificate');
+      }
+
+      const updatedCert: Certificate = await response.json();
+      // Format date for input type="date"
+      updatedCert.date = updatedCert.date ? new Date(updatedCert.date).toISOString().split('T')[0] : "";
+      setCertificates(certificates.map(cert => 
+        cert.id === updatedCert.id ? updatedCert : cert
+      ));
+      setEditingCertificate(null);
+      setSelectedFile(null);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      console.error('Edit error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this certificate?")) return;
     try {
       const response = await fetch(`/api/certificates?id=${id}`, {
         method: "DELETE",
-      })
-      
-      const responseData = await response.json()
-      
+      });
+
       if (!response.ok) {
-        throw new Error(responseData.error || "Failed to delete certificate")
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete certificate');
       }
-      
-      await fetchCertificates()
-      showSuccess("Certificate deleted successfully!")
+
+      setCertificates(certificates.filter(cert => cert.id !== id));
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      console.error('Delete error:', err)
-      setError(err instanceof Error ? err.message : "Failed to delete")
+      console.error('Delete error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete');
     }
-  }
+  };
 
-  const resetForm = () => {
-    setFormData({
-      title: "",
-      organization: "",
-      date: "",
-      credentialUrl: "",
-      imageUrl: ""
-    })
-    setIsEditing(false)
-  }
-
-  if (loading) return <div className="text-center p-8">Loading...</div>
-  if (error) return <div className="text-center text-red-500 p-8">{error}</div>
+  if (loading) return <div className="text-center p-8">Loading...</div>;
+  if (error) return <div className="text-center text-red-500 p-8">{error}</div>;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
@@ -151,113 +175,189 @@ export default function AdminCertificates() {
           </button>
         </div>
 
-        {/* Form Tambah/Edit Sertifikat */}
-        <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg mb-8">
-          <h2 className="text-xl font-semibold mb-4">
-            {isEditing ? "Edit Certificate" : "Add New Certificate"}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              type="text"
-              placeholder="Title"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="bg-gray-700 p-2 rounded"
-            />
-            <input
-              type="text"
-              placeholder="Organization"
-              value={formData.organization}
-              onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
-              className="bg-gray-700 p-2 rounded"
-            />
-            <input
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              className="bg-gray-700 p-2 rounded"
-            />
-            <input
-              type="url"
-              placeholder="Credential URL"
-              value={formData.credentialUrl}
-              onChange={(e) => setFormData({ ...formData, credentialUrl: e.target.value })}
-              className="bg-gray-700 p-2 rounded"
-            />
-            <input
-              type="url"
-              placeholder="Image URL"
-              value={formData.imageUrl}
-              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-              className="bg-gray-700 p-2 rounded"
-            />
-            <div className="col-span-2">
-              <label className="block mb-2">Upload Image (JPEG/PNG)</label>
+        {/* Add New Certificate Form */}
+        <form onSubmit={handleAddSubmit} className="bg-gray-800 p-6 rounded-lg mb-8">
+          <h2 className="text-2xl font-bold mb-4">Add New Certificate</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block mb-2">Title</label>
+              <input
+                type="text"
+                value={newCertificate.title}
+                onChange={(e) => setNewCertificate({ ...newCertificate, title: e.target.value })}
+                className="w-full bg-gray-700 p-2 rounded"
+                required
+              />
+            </div>
+            <div>
+              <label className="block mb-2">Organization</label>
+              <input
+                type="text"
+                value={newCertificate.organization}
+                onChange={(e) => setNewCertificate({ ...newCertificate, organization: e.target.value })}
+                className="w-full bg-gray-700 p-2 rounded"
+                required
+              />
+            </div>
+            <div>
+              <label className="block mb-2">Date (YYYY-MM-DD)</label>
+              <input
+                type="date"
+                value={newCertificate.date}
+                onChange={(e) => setNewCertificate({ ...newCertificate, date: e.target.value })}
+                className="w-full bg-gray-700 p-2 rounded"
+                required
+              />
+            </div>
+            <div>
+              <label className="block mb-2">Credential URL</label>
+              <input
+                type="url"
+                value={newCertificate.credentialUrl || ''}
+                onChange={(e) => setNewCertificate({ ...newCertificate, credentialUrl: e.target.value })}
+                className="w-full bg-gray-700 p-2 rounded"
+              />
+            </div>
+            <div>
+              <label className="block mb-2">Image (JPEG/PNG)</label>
               <input
                 type="file"
                 accept="image/jpeg, image/png"
-                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                className="bg-gray-700 p-2 rounded w-full"
+                onChange={handleFileChange}
+                className="w-full bg-gray-700 p-2 rounded"
               />
-              {(formData.imageUrl || selectedFile) && (
-                <div className="mt-2 text-sm text-gray-400">
-                  {selectedFile ? `Selected file: ${selectedFile.name}` : 
-                    formData.imageUrl ? `Current image: ${formData.imageUrl.substring(0, 50)}...` : ''}
-                </div>
-              )}
             </div>
           </div>
-          <button
-            type="submit"
-            className="mt-4 bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
-          >
-            Save Certificate
-          </button>
+          <div className="mt-6">
+            <button
+              type="submit"
+              className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Add Certificate
+            </button>
+            {success && (
+              <span className="ml-4 text-green-500">
+                Certificate added successfully!
+              </span>
+            )}
+          </div>
         </form>
 
-        {/* Daftar Sertifikat */}
-        <div className="space-y-4">
-          {certificates.map((cert) => (
-            <motion.div
-              key={cert._id?.toString() || `cert-${cert.title}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="bg-gray-800 p-4 rounded-lg flex justify-between items-center"
-            >
-              <div>
-                <h3 className="font-semibold">{cert.title}</h3>
-                <p className="text-gray-400">{cert.organization}</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleEdit(cert)}
-                  className="bg-blue-600 px-3 py-1 rounded hover:bg-blue-700"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(cert._id?.toString())}
-                  className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
-                >
-                  Delete
-                </button>
-              </div>
-            </motion.div>
-          ))}
+        {/* Certificates List */}
+        <div className="bg-gray-800 p-6 rounded-lg">
+          <h2 className="text-2xl font-bold mb-4">Existing Certificates</h2>
+          {certificates.length === 0 ? (
+            <p>No certificates found. Add one above!</p>
+          ) : (
+            <div className="space-y-4">
+              {certificates.map((cert) => (
+                <div key={cert.id} className="bg-gray-700 p-4 rounded flex justify-between items-center">
+                  <div>
+                    <h3 className="text-xl font-semibold">{cert.title}</h3>
+                    <p className="text-gray-400">{cert.organization} - {cert.date}</p>
+                    {cert.credentialUrl && (
+                      <a href={cert.credentialUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline text-sm">View Credential</a>
+                    )}
+                  </div>
+                  <div>
+                    <button
+                      onClick={() => handleEditClick(cert)}
+                      className="bg-yellow-600 px-3 py-1 rounded mr-2 hover:bg-yellow-700"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => cert.id && handleDelete(cert.id)}
+                      className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {error && (
-          <div className="bg-red-500 text-white p-4 rounded-lg mb-4">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="bg-green-500 text-white p-4 rounded-lg mb-4">
-            {successMessage}
+        {/* Edit Certificate Modal/Form */}
+        {editingCertificate && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+            <div className="bg-gray-800 p-6 rounded-lg w-full max-w-md">
+              <h2 className="text-2xl font-bold mb-4">Edit Certificate</h2>
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div>
+                  <label className="block mb-2">Title</label>
+                  <input
+                    type="text"
+                    value={editingCertificate.title}
+                    onChange={(e) => setEditingCertificate({ ...editingCertificate, title: e.target.value })}
+                    className="w-full bg-gray-700 p-2 rounded"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2">Organization</label>
+                  <input
+                    type="text"
+                    value={editingCertificate.organization}
+                    onChange={(e) => setEditingCertificate({ ...editingCertificate, organization: e.target.value })}
+                    className="w-full bg-gray-700 p-2 rounded"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2">Date (YYYY-MM-DD)</label>
+                  <input
+                    type="date"
+                    value={editingCertificate.date}
+                    onChange={(e) => setEditingCertificate({ ...editingCertificate, date: e.target.value })}
+                    className="w-full bg-gray-700 p-2 rounded"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2">Credential URL</label>
+                  <input
+                    type="url"
+                    value={editingCertificate.credentialUrl || ''}
+                    onChange={(e) => setEditingCertificate({ ...editingCertificate, credentialUrl: e.target.value })}
+                    className="w-full bg-gray-700 p-2 rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2">Image (JPEG/PNG)</label>
+                  <input
+                    type="file"
+                    accept="image/jpeg, image/png"
+                    onChange={handleFileChange}
+                    className="w-full bg-gray-700 p-2 rounded"
+                  />
+                  {editingCertificate.imageUrl && (
+                    <div className="mt-2 text-sm text-gray-400">
+                      Current image: {editingCertificate.imageUrl.substring(0, 50)}...
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end space-x-2 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setEditingCertificate(null)}
+                    className="bg-gray-600 px-4 py-2 rounded hover:bg-gray-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }

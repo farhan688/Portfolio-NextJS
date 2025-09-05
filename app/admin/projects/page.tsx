@@ -1,11 +1,24 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
-import { Project } from "@/app/types"
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import type { Project } from "@/app/types";
+
+// Helper to parse techStack from JSON string to string[]
+const parseTechStack = (data: any): string[] => {
+  if (data && typeof data.techStack === 'string') {
+    try {
+      return JSON.parse(data.techStack);
+    } catch (e) {
+      console.error("Failed to parse techStack", e);
+      return []; // Return empty array on parse error
+    }
+  }
+  return data?.techStack || [];
+};
 
 export default function AdminProjects() {
-  const [projects, setProjects] = useState<Project[]>([])
+  const [projects, setProjects] = useState<Project[]>([]);
   const [formData, setFormData] = useState<Partial<Project>>({
     title: "",
     description: "",
@@ -13,94 +26,110 @@ export default function AdminProjects() {
     imageUrl: "",
     demoUrl: "",
     repoUrl: "",
-  })
-  const [techInput, setTechInput] = useState("")
-  const [isEditing, setIsEditing] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string>("")
+  });
+  const [techInput, setTechInput] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string>("");
 
   useEffect(() => {
-    fetchProjects()
-  }, [])
+    fetchProjects();
+  }, []);
 
   async function fetchProjects() {
     try {
-      const response = await fetch("/api/projects")
-      if (!response.ok) throw new Error("Failed to fetch projects")
-      const data = await response.json()
-      setProjects(data)
+      const response = await fetch("/api/projects");
+      if (!response.ok) throw new Error("Failed to fetch projects");
+      const data: Project[] = await response.json();
+      // Parse techStack for each project
+      const formattedData = data.map(project => ({
+        ...project,
+        techStack: parseTechStack(project),
+      }));
+      setProjects(formattedData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong")
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   const showSuccessMessage = (message: string) => {
-    setSuccessMessage(message)
-    setTimeout(() => setSuccessMessage(""), 3000) // Hide after 3 seconds
-  }
+    setSuccessMessage(message);
+    setTimeout(() => setSuccessMessage(""), 3000); // Hide after 3 seconds
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     try {
-      const formDataToSend = new FormData()
-      formDataToSend.append('title', formData.title || '')
-      formDataToSend.append('description', formData.description || '')
-      formDataToSend.append('techStack', JSON.stringify(formData.techStack || []))
-      formDataToSend.append('demoUrl', formData.demoUrl || '')
-      formDataToSend.append('repoUrl', formData.repoUrl || '')
-      formDataToSend.append('imageUrl', formData.imageUrl || '')
+      const formDataToSend = new FormData();
+      formDataToSend.append('title', formData.title || '');
+      formDataToSend.append('description', formData.description || '');
+      formDataToSend.append('techStack', JSON.stringify(formData.techStack || [])); // Stringify array for API
+      formDataToSend.append('demoUrl', formData.demoUrl || '');
+      formDataToSend.append('repoUrl', formData.repoUrl || '');
+      formDataToSend.append('imageUrl', formData.imageUrl || '');
 
       if (selectedFile) {
-        formDataToSend.append('image', selectedFile)
+        formDataToSend.append('image', selectedFile);
       }
 
-      if (isEditing && formData._id) {
-        formDataToSend.append('_id', formData._id.toString())
+      // Use 'id' for update
+      if (isEditing && formData.id) {
+        formDataToSend.append('id', formData.id);
       }
 
-      const url = "/api/projects"
-      const method = isEditing ? "PUT" : "POST"
+      const url = "/api/projects";
+      const method = isEditing ? "PUT" : "POST";
       
       const response = await fetch(url, {
         method,
         body: formDataToSend,
-      })
+      });
 
-      if (!response.ok) throw new Error("Failed to save project")
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save project");
+      }
       
-      await fetchProjects()
-      resetForm()
-      showSuccessMessage(isEditing ? "Project updated successfully!" : "Project created successfully!")
+      await fetchProjects();
+      resetForm();
+      showSuccessMessage(isEditing ? "Project updated successfully!" : "Project created successfully!");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save")
+      setError(err instanceof Error ? err.message : "Failed to save");
     }
-  }
+  };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this project?")) return
+    if (!confirm("Are you sure you want to delete this project?")) return;
     
     try {
       const response = await fetch(`/api/projects?id=${id}`, {
         method: "DELETE",
-      })
+      });
       
-      if (!response.ok) throw new Error("Failed to delete project")
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete project");
+      }
       
-      await fetchProjects()
-      showSuccessMessage("Project deleted successfully!")
+      await fetchProjects();
+      showSuccessMessage("Project deleted successfully!");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete")
+      setError(err instanceof Error ? err.message : "Failed to delete");
     }
-  }
+  };
 
   const handleEdit = (project: Project) => {
-    setFormData(project)
-    setIsEditing(true)
-  }
+    // Parse techStack when setting formData for editing
+    setFormData({
+      ...project,
+      techStack: parseTechStack(project),
+    });
+    setIsEditing(true);
+  };
 
   const resetForm = () => {
     setFormData({
@@ -110,33 +139,31 @@ export default function AdminProjects() {
       imageUrl: "",
       demoUrl: "",
       repoUrl: "",
-    })
-    setTechInput("")
-    setIsEditing(false)
-    setSelectedFile(null)
-  }
+    });
+    setTechInput("");
+    setIsEditing(false);
+    setSelectedFile(null);
+  };
 
   const handleAddTech = () => {
-    if (techInput.trim() && formData.techStack) {
+    if (techInput.trim()) { // Removed formData.techStack check as it's always an array
       setFormData({
         ...formData,
-        techStack: [...formData.techStack, techInput.trim()]
-      })
-      setTechInput("")
+        techStack: [...(formData.techStack || []), techInput.trim()]
+      });
+      setTechInput("");
     }
-  }
+  };
 
   const handleRemoveTech = (index: number) => {
-    if (formData.techStack) {
-      setFormData({
-        ...formData,
-        techStack: formData.techStack.filter((_, i) => i !== index)
-      })
-    }
-  }
+    setFormData({
+      ...formData,
+      techStack: (formData.techStack || []).filter((_, i) => i !== index)
+    });
+  };
 
-  if (loading) return <div className="text-center p-8">Loading...</div>
-  if (error) return <div className="text-center text-red-500 p-8">{error}</div>
+  if (loading) return <div className="text-center p-8">Loading...</div>;
+  if (error) return <div className="text-center text-red-500 p-8">{error}</div>;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
@@ -162,7 +189,7 @@ export default function AdminProjects() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Manage Projects</h1>
           <button
-            onClick={() => window.location.href = "/admin"}
+            onClick={() => (window.location.href = "/admin")}
             className="bg-gray-700 px-4 py-2 rounded-lg hover:bg-gray-600"
           >
             Back to Dashboard
@@ -178,13 +205,13 @@ export default function AdminProjects() {
             <input
               type="text"
               placeholder="Title"
-              value={formData.title}
+              value={formData.title || ""}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className="bg-gray-700 p-2 rounded"
             />
             <textarea
               placeholder="Description"
-              value={formData.description}
+              value={formData.description || ""}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="bg-gray-700 p-2 rounded h-32"
             />
@@ -245,14 +272,14 @@ export default function AdminProjects() {
             <input
               type="url"
               placeholder="Demo URL"
-              value={formData.demoUrl}
+              value={formData.demoUrl || ""}
               onChange={(e) => setFormData({ ...formData, demoUrl: e.target.value })}
               className="bg-gray-700 p-2 rounded"
             />
             <input
               type="url"
               placeholder="Repository URL"
-              value={formData.repoUrl}
+              value={formData.repoUrl || ""}
               onChange={(e) => setFormData({ ...formData, repoUrl: e.target.value })}
               className="bg-gray-700 p-2 rounded"
             />
@@ -280,7 +307,7 @@ export default function AdminProjects() {
         <div className="space-y-4">
           {projects.map((project) => (
             <motion.div
-              key={project._id?.toString()}
+              key={project.id} // Use project.id
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="bg-gray-800 p-4 rounded-lg"
@@ -308,7 +335,7 @@ export default function AdminProjects() {
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDelete(project._id?.toString() || "")}
+                    onClick={() => project.id && handleDelete(project.id)}
                     className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
                   >
                     Delete
@@ -320,5 +347,5 @@ export default function AdminProjects() {
         </div>
       </div>
     </div>
-  )
+  );
 }

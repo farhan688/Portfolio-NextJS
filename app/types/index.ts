@@ -1,100 +1,96 @@
-import { ObjectId } from 'mongodb'
-
-export interface Certificate {
-  _id?: ObjectId | string
-  title: string
-  organization: string
-  date: string
-  credentialUrl: string
-  imageUrl: string
-  file?: File | null
-  fileName?: string
-  fileType?: string
-  createdAt?: Date
-  updatedAt?: Date
-}
+// These types are for the frontend state and should match the parsed API responses.
 
 export interface Project {
-  _id?: ObjectId | string
-  title: string
-  description: string
-  techStack: string[]
-  imageUrl: string
-  demoUrl?: string
-  repoUrl?: string
-  createdAt?: Date
-  updatedAt?: Date
+  id?: string;
+  title: string;
+  description: string;
+  techStack: string[]; // Parsed from JSON string
+  imageUrl: string;
+  demoUrl?: string;
+  repoUrl?: string;
+  createdAt?: string; // Dates will be strings after JSON serialization
+  updatedAt?: string;
 }
 
 export interface Experience {
-  _id?: string | ObjectId
-  title: string
-  company: string
-  period: string
-  achievements: string[]
+  id?: string;
+  role: string;
+  company: string;
+  startDate: string;
+  endDate?: string | null;
+  description: string[]; // Parsed from JSON string
+  period?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Certificate {
+  id?: string;
+  title: string;
+  organization: string;
+  date: string;
+  credentialUrl?: string | null;
+  imageUrl: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Skill {
-  _id?: ObjectId | string
-  category: string
-  items: string[]
-  createdAt?: Date
-  updatedAt?: Date
+  id?: string;
+  name: string;
+  category: string;
 }
 
 export interface About {
-  _id?: ObjectId | string
-  title: string
-  description: string
-  imageUrl?: string
-  socialLinks?: {
-    github?: string
-    linkedin?: string
-    twitter?: string
-    email?: string
-  }
-  createdAt?: Date
-  updatedAt?: Date
+  id?: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  socialLinks: { // Parsed from JSON string
+    github?: string;
+    linkedin?: string;
+    twitter?: string;
+    email?: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Resume {
-  _id?: ObjectId | string
-  personalInfo: {
-    name: string
-    email: string
-    location: string
-    linkedin?: string
-  }
-  summary: string
-  education: {
-    _id?: ObjectId | string
-    degree: string
-    university: string
-    year: string
-    courses: string[]
-  }[]
-  experience: {
-    _id?: ObjectId | string
-    title: string
-    company: string
-    period: string
-    achievements: string[]
-  }[]
-  pdfFile?: File | null
-  pdfFileName?: string
-  pdfFileData?: string
-  contentType?: string
-  pdfUrl: string
-  createdAt?: Date
-  updatedAt?: Date
+    id?: string;
+    personalInfo: {
+        name?: string;
+        email?: string;
+        location?: string;
+        linkedin?: string;
+    }; // Parsed from JSON string
+    summary: string;
+    education: {
+        degree?: string;
+        university?: string;
+        year?: string;
+        courses?: string[];
+    }[]; // Parsed from JSON string
+    experience: {
+        title?: string;
+        company?: string;
+        period?: string;
+        achievements?: string[];
+    }[]; // Parsed from JSON string
+    pdfFile?: File | null;
+    pdfFileData?: string | null;
+    pdfFileName?: string | null;
+    contentType?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
+
 export interface ContactMessage {
-  _id?: ObjectId | string
-  name: string
-  email: string
-  phone: string
-  message: string
-  createdAt?: Date
-  updatedAt?: Date
+  id?: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  message: string;
+  createdAt?: string;
 }

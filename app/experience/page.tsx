@@ -12,19 +12,46 @@ export default function Experience() {
   useEffect(() => {
     async function fetchExperiences() {
       try {
-        const response = await fetch("/api/experience")
-        if (!response.ok) throw new Error("Failed to fetch experiences")
-        const data = await response.json()
-        setExperiences(data)
+        const response = await fetch("/api/experience");
+        if (!response.ok) throw new Error("Failed to fetch experiences");
+        const data: any[] = await response.json();
+
+        const formattedData = data.map(exp => {
+          let desc: string[] = [];
+          if (typeof exp.description === 'string') {
+            try {
+              const parsed = JSON.parse(exp.description);
+              if (Array.isArray(parsed)) {
+                desc = parsed;
+              }
+            } catch (e) {
+              console.error("Failed to parse description:", e);
+            }
+          } else if (Array.isArray(exp.description)) {
+            desc = exp.description;
+          }
+          
+          const formattedStartDate = exp.startDate ? new Date(exp.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : '';
+          const formattedEndDate = exp.endDate ? new Date(exp.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : 'Present';
+
+          return {
+            ...exp,
+            description: desc,
+            // Create a period string for display
+            period: `${formattedStartDate} - ${formattedEndDate}`,
+          };
+        });
+
+        setExperiences(formattedData);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong")
+        setError(err instanceof Error ? err.message : "Something went wrong");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
 
-    fetchExperiences()
-  }, [])
+    fetchExperiences();
+  }, []);
 
   if (loading) {
     return (
@@ -59,7 +86,7 @@ export default function Experience() {
         <div className="space-y-8">
           {experiences.map((exp, index) => (
             <motion.div 
-              key={exp._id?.toString() || `exp-${exp.company}-${index}`}
+              key={exp.id || `exp-${exp.company}-${index}`}
               className="bg-gray-800 rounded-lg p-6 shadow-lg"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -70,19 +97,19 @@ export default function Experience() {
                 ease: "easeOut"
               }}
             >
-              <h2 className="text-2xl font-semibold text-blue-300">{exp.title}</h2>
+              <h2 className="text-2xl font-semibold text-blue-300">{exp.role}</h2>
               <p className="text-xl text-gray-400 mb-2">{exp.company}</p>
               <p className="text-gray-500 mb-4">{exp.period}</p>
               <ul className="list-disc list-inside space-y-2">
-                {exp.achievements.map((achievement: string, achievementIndex: number) => (
+                {exp.description.map((item: string, itemIndex: number) => (
                   <motion.li 
-                    key={`${exp._id?.toString() || index}-achievement-${achievementIndex}`}
+                    key={`${exp.id || index}-achievement-${itemIndex}`}
                     className="text-gray-300"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: (index * 0.1) + (achievementIndex * 0.05) }}
+                    transition={{ delay: (index * 0.1) + (itemIndex * 0.05) }}
                   >
-                    {achievement}
+                    {item}
                   </motion.li>
                 ))}
               </ul>

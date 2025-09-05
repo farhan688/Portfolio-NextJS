@@ -65,7 +65,7 @@ export default function Certificates() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         {currentCertificates.map((cert) => (
           <motion.div
-            key={cert._id?.toString() || `cert-${cert.title}-${cert.organization}`}
+            key={cert.id?.toString() || `cert-${cert.title}-${cert.organization}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-gray-800 rounded-lg shadow-md p-6 flex items-center"

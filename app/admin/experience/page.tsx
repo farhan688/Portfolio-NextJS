@@ -1,58 +1,86 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
-import type { Experience } from "@/app/types"
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import type { Experience } from "@/app/types";
+
+
 
 export default function AdminExperience() {
-  const [experiences, setExperiences] = useState<Experience[]>([])
+  const [experiences, setExperiences] = useState<Experience[]>([]);
   const [formData, setFormData] = useState<Partial<Experience>>({
-    title: "",
-    company: "", 
-    period: "",
-    achievements: []
-  })
-  const [achievementInput, setAchievementInput] = useState("")
-  const [isEditing, setIsEditing] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+    role: "",
+    company: "",
+    startDate: "",
+    endDate: "",
+    description: [],
+  });
+  const [descriptionInput, setDescriptionInput] = useState(""); // Renamed from achievementInput
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    fetchExperiences()
-  }, [])
+    fetchExperiences();
+  }, []);
 
   async function fetchExperiences() {
     try {
-      const response = await fetch("/api/experience")
-      if (!response.ok) throw new Error("Failed to fetch experiences")
-      const data = await response.json()
-      setExperiences(data)
+      const response = await fetch("/api/experience");
+      if (!response.ok) throw new Error("Failed to fetch experiences");
+      const data: any[] = await response.json(); // Treat as any to avoid lying to TS
+
+      // Manually parse the description field for each experience
+      const formattedData = data.map(exp => {
+        let desc: string[] = [];
+        if (typeof exp.description === 'string') {
+          try {
+            // Ensure what's parsed is an array
+            const parsed = JSON.parse(exp.description);
+            if (Array.isArray(parsed)) {
+              desc = parsed;
+            }
+          } catch (e) {
+            console.error("Failed to parse description:", e);
+            // desc remains []
+          }
+        } else if (Array.isArray(exp.description)) {
+          // It's already an array
+          desc = exp.description;
+        }
+
+        return {
+          ...exp,
+          description: desc, // Now it's guaranteed to be an array
+          startDate: exp.startDate ? new Date(exp.startDate).toISOString().split('T')[0] : "",
+          endDate: exp.endDate ? new Date(exp.endDate).toISOString().split('T')[0] : "",
+        };
+      });
+
+      setExperiences(formattedData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong")
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
+    e.preventDefault();
+    setError(null);
     
     try {
-      const method = isEditing ? "PUT" : "POST"
+      const method = isEditing ? "PUT" : "POST";
       
-      // Pastikan _id terkirim saat update
-      const dataToSend = isEditing 
-        ? formData 
-        : {
-            title: formData.title || "",
-            company: formData.company || "",
-            period: formData.period || "",
-            achievements: formData.achievements || []
-          }
-
-      console.log('Sending data:', dataToSend)
+      const dataToSend = {
+        id: isEditing ? formData.id : undefined, // Include ID only for PUT
+        role: formData.role || "",
+        company: formData.company || "",
+        startDate: formData.startDate || "",
+        endDate: formData.endDate || null,
+        description: JSON.stringify(formData.description || []), // Stringify array for API
+      };
 
       const response = await fetch("/api/experience", {
         method,
@@ -60,39 +88,39 @@ export default function AdminExperience() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(dataToSend),
-      })
+      });
 
-      const responseData = await response.json()
+      const responseData = await response.json();
 
       if (!response.ok) {
-        throw new Error(responseData.error || "Failed to save experience")
+        throw new Error(responseData.error || "Failed to save experience");
       }
 
-      await fetchExperiences()
-      resetForm()
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
+      await fetchExperiences();
+      resetForm();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      console.error('Submit error:', err)
-      setError(err instanceof Error ? err.message : "Failed to save")
+      console.error('Submit error:', err);
+      setError(err instanceof Error ? err.message : "Failed to save");
     }
-  }
+  };
 
   const handleEdit = (exp: Experience) => {
-    if (!exp._id) return;
     setFormData({
-      _id: exp._id,
-      title: exp.title || "",
+      id: exp.id, // Use 'id'
+      role: exp.role || "",
       company: exp.company || "",
-      period: exp.period || "",
-      achievements: Array.isArray(exp.achievements) ? [...exp.achievements] : []
-    })
-    setIsEditing(true)
-    setError(null)
-  }
+      startDate: exp.startDate || "",
+      endDate: exp.endDate || "",
+      description: Array.isArray(exp.description) ? [...exp.description] : [], // Ensure it's an array
+    });
+    setIsEditing(true);
+    setDescriptionInput(""); // Clear input for new description items
+    setError(null);
+  };
 
-  const handleDelete = async (id: string | undefined) => {
-    if (!id) return;
+  const handleDelete = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus pengalaman kerja ini? Tindakan ini tidak dapat dibatalkan.")) {
       return;
     }
@@ -100,30 +128,35 @@ export default function AdminExperience() {
     try {
       const response = await fetch(`/api/experience?id=${id}`, {
         method: "DELETE",
-      })
+      });
       
-      if (!response.ok) throw new Error("Gagal menghapus pengalaman")
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Gagal menghapus pengalaman");
+      }
       
-      await fetchExperiences()
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
+      await fetchExperiences();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal menghapus")
+      setError(err instanceof Error ? err.message : "Gagal menghapus");
     }
-  }
+  };
 
   const resetForm = () => {
     setFormData({
-      title: "",
+      role: "",
       company: "",
-      period: "",
-      achievements: []
-    })
-    setIsEditing(false)
-    setAchievementInput("")
-  }
+      startDate: "",
+      endDate: "",
+      description: [],
+    });
+    setIsEditing(false);
+    setDescriptionInput("");
+  };
 
-  if (loading) return <div className="text-center p-8">Loading...</div>
+  if (loading) return <div className="text-center p-8">Loading...</div>;
+  if (error) return <div className="text-center text-red-500 p-8">{error}</div>;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
@@ -131,7 +164,7 @@ export default function AdminExperience() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Manage Experience</h1>
           <button
-            onClick={() => window.location.href = "/admin"}
+            onClick={() => (window.location.href = "/admin")}
             className="bg-gray-700 px-4 py-2 rounded-lg hover:bg-gray-600"
           >
             Back to Dashboard
@@ -154,48 +187,60 @@ export default function AdminExperience() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <input
               type="text"
-              placeholder="Job Title"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder="Role (e.g., Software Engineer)"
+              value={formData.role || ""}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               className="bg-gray-700 p-2 rounded"
               required
             />
             <input
               type="text"
               placeholder="Company"
-              value={formData.company}
+              value={formData.company || ""}
               onChange={(e) => setFormData({ ...formData, company: e.target.value })}
               className="bg-gray-700 p-2 rounded"
               required
             />
-            <input
-              type="text"
-              placeholder="Period (e.g., 2020 - Present)"
-              value={formData.period}
-              onChange={(e) => setFormData({ ...formData, period: e.target.value })}
-              className="bg-gray-700 p-2 rounded"
-              required
-            />
+            <div>
+              <label className="block mb-2 text-sm text-gray-400">Start Date</label>
+              <input
+                type="date"
+                value={formData.startDate || ""}
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                className="bg-gray-700 p-2 rounded w-full"
+                required
+              />
+            </div>
+            <div>
+              <label className="block mb-2 text-sm text-gray-400">End Date (Optional)</label>
+              <input
+                type="date"
+                value={formData.endDate || ""}
+                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                className="bg-gray-700 p-2 rounded w-full"
+              />
+            </div>
           </div>
 
           <div className="mb-4">
+            <label className="block mb-2">Description / Achievements</label>
             <div className="flex gap-2 mb-2">
               <input
                 type="text"
-                placeholder="Add Achievement"
-                value={achievementInput}
-                onChange={(e) => setAchievementInput(e.target.value)}
+                placeholder="Add description item"
+                value={descriptionInput}
+                onChange={(e) => setDescriptionInput(e.target.value)}
                 className="flex-1 bg-gray-700 p-2 rounded"
               />
               <button
                 type="button"
                 onClick={() => {
-                  if (achievementInput.trim()) {
+                  if (descriptionInput.trim()) {
                     setFormData({
                       ...formData,
-                      achievements: [...(formData.achievements || []), achievementInput.trim()]
-                    })
-                    setAchievementInput("")
+                      description: [...(formData.description || []), descriptionInput.trim()]
+                    });
+                    setDescriptionInput("");
                   }
                 }}
                 className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
@@ -205,14 +250,14 @@ export default function AdminExperience() {
             </div>
 
             <div className="space-y-2">
-              {formData.achievements?.map((achievement, index) => (
+              {formData.description?.map((item, index) => (
                 <div key={index} className="flex items-center gap-2 bg-gray-700 p-2 rounded">
-                  <span className="flex-1">{achievement}</span>
+                  <span className="flex-1">{item}</span>
                   <button
                     type="button"
                     onClick={() => setFormData({
                       ...formData,
-                      achievements: formData.achievements?.filter((_, i) => i !== index)
+                      description: formData.description?.filter((_, i) => i !== index)
                     })}
                     className="text-red-400 hover:text-red-300"
                   >
@@ -234,16 +279,16 @@ export default function AdminExperience() {
         <div className="space-y-4">
           {experiences.map((exp) => (
             <motion.div
-              key={exp._id?.toString()}
+              key={exp.id} // Use exp.id
               className="bg-gray-800 p-6 rounded-lg"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="text-xl font-semibold">{exp.title}</h3>
+                  <h3 className="text-xl font-semibold">{exp.role}</h3> {/* Use exp.role */}
                   <p className="text-gray-400">{exp.company}</p>
-                  <p className="text-gray-500">{exp.period}</p>
+                  <p className="text-gray-500">{exp.startDate} - {exp.endDate || "Present"}</p> {/* Use start/end dates */}
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -253,7 +298,7 @@ export default function AdminExperience() {
                     Edit
                   </button>
                   <button
-                    onClick={() => exp._id && handleDelete(exp._id.toString())}
+                    onClick={() => exp.id && handleDelete(exp.id)} // Use exp.id
                     className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
                   >
                     Delete
@@ -261,9 +306,9 @@ export default function AdminExperience() {
                 </div>
               </div>
               <ul className="list-disc list-inside space-y-1">
-                {exp.achievements.map((achievement, index) => (
+                {exp.description.map((item, index) => (
                   <li key={index} className="text-gray-300">
-                    {achievement}
+                    {item}
                   </li>
                 ))}
               </ul>
@@ -272,5 +317,5 @@ export default function AdminExperience() {
         </div>
       </div>
     </div>
-  )
-} 
+  );
+}

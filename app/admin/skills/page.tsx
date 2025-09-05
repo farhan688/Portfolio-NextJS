@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
@@ -7,10 +7,9 @@ import type { Skill } from "@/app/types"
 export default function AdminSkills() {
   const [skills, setSkills] = useState<Skill[]>([])
   const [formData, setFormData] = useState<Partial<Skill>>({
+    name: "",
     category: "",
-    items: []
   })
-  const [itemInput, setItemInput] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -22,6 +21,7 @@ export default function AdminSkills() {
   }, [])
 
   async function fetchSkills() {
+    setLoading(true)
     try {
       const response = await fetch("/api/skills")
       if (!response.ok) throw new Error("Failed to fetch skills")
@@ -46,6 +46,11 @@ export default function AdminSkills() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    if (!formData.name || !formData.category) {
+      setError("Name and category are required.")
+      return
+    }
     
     try {
       const method = isEditing ? "PUT" : "POST"
@@ -75,12 +80,13 @@ export default function AdminSkills() {
 
   const handleEdit = (skill: Skill) => {
     setFormData({
-      _id: skill._id,
+      id: skill.id,
+      name: skill.name || "",
       category: skill.category || "",
-      items: Array.isArray(skill.items) ? [...skill.items] : []
     })
     setIsEditing(true)
     setError(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleDelete = async (id?: string) => {
@@ -107,12 +113,21 @@ export default function AdminSkills() {
 
   const resetForm = () => {
     setFormData({
+      name: "",
       category: "",
-      items: []
     })
     setIsEditing(false)
-    setItemInput("")
   }
+
+  // Group skills by category for display
+  const groupedSkills = skills.reduce((acc, skill) => {
+    const category = skill.category || "Uncategorized"
+    if (!acc[category]) {
+      acc[category] = []
+    }
+    acc[category].push(skill)
+    return acc
+  }, {} as Record<string, Skill[]>)
 
   if (loading) return <div className="text-center p-8">Loading...</div>
 
@@ -141,111 +156,93 @@ export default function AdminSkills() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg mb-8">
-          <div className="mb-4">
+        <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg mb-8 space-y-4">
+          <h2 className="text-xl font-semibold">{isEditing ? "Edit Skill" : "Add New Skill"}</h2>
+          <div>
+            <label htmlFor="name" className="block mb-2">Skill Name</label>
             <input
+              id="name"
               type="text"
-              placeholder="Skill Category"
-              value={formData.category}
+              placeholder="e.g., JavaScript"
+              value={formData.name || ""}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full bg-gray-700 p-2 rounded"
+              required
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="category" className="block mb-2">Category</label>
+            <input
+              id="category"
+              type="text"
+              placeholder="e.g., Frontend"
+              value={formData.category || ""}
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               className="w-full bg-gray-700 p-2 rounded"
               required
             />
           </div>
 
-          <div className="mb-4">
-            <div className="flex gap-2 mb-2">
-              <input
-                type="text"
-                placeholder="Add Skill Item"
-                value={itemInput}
-                onChange={(e) => setItemInput(e.target.value)}
-                className="flex-1 bg-gray-700 p-2 rounded"
-              />
+          
+
+          <div className="flex gap-4">
+            <button
+              type="submit"
+              className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
+            >
+              {isEditing ? "Update Skill" : "Add Skill"}
+            </button>
+            {isEditing && (
               <button
                 type="button"
-                onClick={() => {
-                  if (itemInput.trim()) {
-                    setFormData({
-                      ...formData,
-                      items: [...(formData.items || []), itemInput.trim()]
-                    })
-                    setItemInput("")
-                  }
-                }}
-                className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
+                onClick={resetForm}
+                className="bg-gray-600 px-4 py-2 rounded hover:bg-gray-500"
               >
-                Add
+                Cancel Edit
               </button>
-            </div>
-
-            <div className="space-y-2">
-              {formData.items?.map((item, index) => (
-                <div key={`form-item-${index}`} className="flex items-center gap-2 bg-gray-700 p-2 rounded">
-                  <span className="flex-1">{item}</span>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({
-                      ...formData,
-                      items: formData.items?.filter((_, i) => i !== index)
-                    })}
-                    className="text-red-400 hover:text-red-300"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
+            )}
           </div>
-
-          <button
-            type="submit"
-            className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
-          >
-            {isEditing ? "Update Skill" : "Add Skill"}
-          </button>
         </form>
 
         {/* Skills List */}
-        <div className="space-y-4">
-          {skills.map((skill) => (
-            <motion.div
-              key={skill._id?.toString() || `skill-${skill.category}`}
-              className="bg-gray-800 p-6 rounded-lg"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-xl font-semibold">{skill.category}</h3>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(skill)}
-                    className="bg-blue-600 px-3 py-1 rounded hover:bg-blue-700"
+        <div className="space-y-8">
+          {Object.entries(groupedSkills).map(([category, skillsInCategory]) => (
+            <div key={category}>
+              <h3 className="text-2xl font-semibold mb-4 border-b-2 border-gray-700 pb-2">{category}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {skillsInCategory.map((skill) => (
+                  <motion.div
+                    key={skill.id}
+                    className="bg-gray-800 p-4 rounded-lg flex justify-between items-center"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
                   >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(skill._id?.toString())}
-                    className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {skill.items.map((item, index) => (
-                  <span
-                    key={`${skill._id}-item-${index}`}
-                    className="bg-gray-700 px-3 py-1 rounded-full"
-                  >
-                    {item}
-                  </span>
+                    <div>
+                      <p className="font-semibold">{skill.name}</p>
+                      
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEdit(skill)}
+                        className="bg-blue-600 px-3 py-1 text-sm rounded hover:bg-blue-700"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(skill.id)}
+                        className="bg-red-600 px-3 py-1 text-sm rounded hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </motion.div>
                 ))}
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>
     </div>
   )
-} 
+}

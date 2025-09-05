@@ -1,22 +1,27 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
-import type { About } from "@/app/types"
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import type { About } from "@/app/types";
+
+// Helper to ensure socialLinks is an object
+const parseSocialLinks = (data: any): About['socialLinks'] => {
+  // Ensure data and socialLinks exist and socialLinks is a string
+  if (data && typeof data.socialLinks === 'string' && data.socialLinks.trim() !== '') {
+    try {
+      return JSON.parse(data.socialLinks);
+    } catch (e) {
+      console.error("Failed to parse socialLinks", e);
+      // If parsing fails, return an empty object to prevent further errors
+      return {};
+    }
+  }
+  // If socialLinks is not a string, or is empty, or data is null/undefined, return an empty object
+  return {};
+};
 
 export default function AdminAbout() {
-  const [formData, setFormData] = useState<About>({
-    _id: undefined,
-    title: "",
-    description: "",
-    imageUrl: "",
-    socialLinks: {
-      github: "",
-      linkedin: "",
-      twitter: "",
-      email: ""
-    }
-  });
+  const [formData, setFormData] = useState<About | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +32,20 @@ export default function AdminAbout() {
       try {
         const response = await fetch("/api/about");
         if (!response.ok) throw new Error("Failed to fetch about data");
-        const data = await response.json();
+        let data = await response.json();
+        
+        // Ensure data is not null and parse socialLinks
+        if (data && data.id) { // Check if data is a real record
+            data.socialLinks = parseSocialLinks(data);
+        } else {
+            // Initialize with default structure if no data exists
+            data = {
+                title: "",
+                description: "",
+                imageUrl: "",
+                socialLinks: { github: "", linkedin: "", twitter: "", email: "" }
+            };
+        }
         setFormData(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
@@ -41,6 +59,8 @@ export default function AdminAbout() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData) return;
+
     try {
       const formDataToSend = new FormData();
       formDataToSend.append('title', formData.title);
@@ -48,18 +68,18 @@ export default function AdminAbout() {
       formDataToSend.append('socialLinks', JSON.stringify(formData.socialLinks));
       formDataToSend.append('imageUrl', formData.imageUrl || '');
 
-      // Append the file if it exists
       if (selectedFile) {
         formDataToSend.append('image', selectedFile);
       }
 
-      // Append _id only if it exists and is a valid string
-      if (formData._id && typeof formData._id === 'string') {
-        formDataToSend.append('_id', formData._id);
+      // Use 'id' from prisma
+      if (formData.id) {
+        formDataToSend.append('id', formData.id);
       }
 
+      // The API now uses PUT for upserting, so method is always PUT
       const response = await fetch('/api/about', {
-        method: formData._id ? 'PUT' : 'POST',
+        method: 'PUT',
         body: formDataToSend,
       });
 
@@ -68,7 +88,12 @@ export default function AdminAbout() {
         throw new Error(errorData.error || 'Failed to save about data');
       }
 
-      const updatedData = await response.json();
+      let updatedData = await response.json();
+      // Also parse social links from the response of the update
+      if (updatedData) {
+        updatedData.socialLinks = parseSocialLinks(updatedData);
+      }
+
       setFormData(updatedData);
       setSelectedFile(null);
       setSuccess(true);
@@ -81,6 +106,8 @@ export default function AdminAbout() {
 
   if (loading) return <div className="text-center p-8">Loading...</div>;
   if (error) return <div className="text-center text-red-500 p-8">{error}</div>;
+  // Render form only when formData is not null
+  if (!formData) return <div className="text-center p-8">No data available.</div>;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
@@ -136,7 +163,7 @@ export default function AdminAbout() {
                 <label className="block mb-2">GitHub URL</label>
                 <input
                   type="url"
-                  value={formData.socialLinks?.github}
+                  value={formData.socialLinks?.github || ''}
                   onChange={(e) => setFormData({
                     ...formData,
                     socialLinks: { ...formData.socialLinks, github: e.target.value }
@@ -149,7 +176,7 @@ export default function AdminAbout() {
                 <label className="block mb-2">LinkedIn URL</label>
                 <input
                   type="url"
-                  value={formData.socialLinks?.linkedin}
+                  value={formData.socialLinks?.linkedin || ''}
                   onChange={(e) => setFormData({
                     ...formData,
                     socialLinks: { ...formData.socialLinks, linkedin: e.target.value }
@@ -162,7 +189,7 @@ export default function AdminAbout() {
                 <label className="block mb-2">Twitter URL</label>
                 <input
                   type="url"
-                  value={formData.socialLinks?.twitter}
+                  value={formData.socialLinks?.twitter || ''}
                   onChange={(e) => setFormData({
                     ...formData,
                     socialLinks: { ...formData.socialLinks, twitter: e.target.value }
@@ -175,7 +202,7 @@ export default function AdminAbout() {
                 <label className="block mb-2">Email</label>
                 <input
                   type="email"
-                  value={formData.socialLinks?.email}
+                  value={formData.socialLinks?.email || ''}
                   onChange={(e) => setFormData({
                     ...formData,
                     socialLinks: { ...formData.socialLinks, email: e.target.value }

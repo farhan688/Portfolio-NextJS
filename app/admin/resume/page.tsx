@@ -1,163 +1,237 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
-import type { Resume } from "@/app/types"
-import { ObjectId } from "mongodb"
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import type { Resume } from "@/app/types";
+
+// Helper to parse JSON strings from API response
+const parseJsonField = (data: any, field: string, defaultValue: any) => {
+  if (data && typeof data[field] === 'string') {
+    try {
+      return JSON.parse(data[field]);
+    } catch (e) {
+      console.error(`Failed to parse ${field}`, e);
+      return defaultValue;
+    }
+  }
+  return data?.[field] || defaultValue;
+};
 
 export default function AdminResume() {
-  const [formData, setFormData] = useState<Resume>({
-    _id: undefined,
-    personalInfo: {
-      name: "",
-      email: "", 
-      location: "",
-      linkedin: ""
-    },
-    summary: "",
-    education: [],
-    experience: [],
-    pdfUrl: ""
-  })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [formData, setFormData] = useState<Resume | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [newEducation, setNewEducation] = useState({
     degree: "",
     university: "",
     year: "",
-    courses: [] as string[]
-  })
+    courses: [] as string[],
+  });
   const [newExperience, setNewExperience] = useState({
     title: "",
     company: "",
     period: "",
-    achievements: [] as string[]
-  })
-  const [courseInput, setCourseInput] = useState("")
-  const [achievementInput, setAchievementInput] = useState("")
+    achievements: [] as string[],
+  });
+  const [courseInput, setCourseInput] = useState("");
+  const [achievementInput, setAchievementInput] = useState("");
 
   useEffect(() => {
-    fetchResume()
-  }, [])
+    fetchResume();
+  }, []);
 
   async function fetchResume() {
     try {
-      const response = await fetch("/api/resume")
-      if (!response.ok) throw new Error("Failed to fetch resume")
-      const data = await response.json()
-      setFormData(data)
+      const response = await fetch("/api/resume");
+      if (!response.ok) throw new Error("Failed to fetch resume");
+      let data = await response.json();
+
+      if (data) {
+        const cleanData: Resume = {
+          id: data.id,
+          personalInfo: parseJsonField(data, 'personalInfo', {}),
+          summary: data.summary,
+          education: parseJsonField(data, 'education', []),
+          experience: parseJsonField(data, 'experience', []),
+          pdfFileName: data.pdfFileName,
+          contentType: data.contentType,
+          pdfFile: null,
+        };
+
+        if (!Array.isArray(cleanData.education)) {
+          cleanData.education = [];
+        }
+        if (!Array.isArray(cleanData.experience)) {
+          cleanData.experience = [];
+        }
+
+        setFormData(cleanData);
+      } else {
+        // Initialize with default structure if no data exists
+        setFormData({
+          personalInfo: { name: "", email: "", location: "", linkedin: "" },
+          summary: "",
+          education: [],
+          experience: [],
+          pdfFileName: null,
+          contentType: null,
+        });
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong")
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
+    e.preventDefault();
+    setError(null);
+    if (!formData) return;
     
     try {
-      const submitFormData = new FormData()
+      const submitFormData = new FormData();
       
-      // Add PDF file if exists
+      // Append PDF file if exists
+      // The type definition for pdfFile is File | null, so check instanceof File
       if (formData.pdfFile instanceof File) {
-        submitFormData.append('pdfFile', formData.pdfFile)
+        submitFormData.append('pdfFile', formData.pdfFile);
       }
 
-      // Prepare resume data without the File object
+      // Prepare resume data by stringifying JSON fields
       const resumeDataToSend = {
-        ...formData,
-        pdfFile: undefined, // Remove File object
-      }
+        id: formData.id, // Include ID for update
+        personalInfo: JSON.stringify(formData.personalInfo),
+        summary: formData.summary,
+        education: JSON.stringify(formData.education),
+        experience: JSON.stringify(formData.experience),
+        // pdfFile, pdfFileName, contentType are handled separately or already in formData
+      };
 
-      submitFormData.append('resumeData', JSON.stringify(resumeDataToSend))
+      submitFormData.append('resumeData', JSON.stringify(resumeDataToSend));
 
       const response = await fetch("/api/resume", {
         method: "PUT",
         body: submitFormData,
-      })
-
-      const responseData = await response.json()
+      });
 
       if (!response.ok) {
-        throw new Error(responseData.error || "Failed to save resume")
+        let errorMessage = "Failed to save resume";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // Response was not JSON, use default error message
+          console.error("Could not parse error response as JSON:", e);
+        }
+        throw new Error(errorMessage);
       }
+
+      const responseData = await response.json();
       
-      setFormData(responseData)
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
+      const updatedResume: Resume = {
+        id: responseData.id,
+        personalInfo: parseJsonField(responseData, 'personalInfo', {}),
+        summary: responseData.summary,
+        education: parseJsonField(responseData, 'education', []),
+        experience: parseJsonField(responseData, 'experience', []),
+        pdfFileName: responseData.pdfFileName,
+        contentType: responseData.contentType,
+        pdfFile: formData.pdfFile, // Keep the existing file object
+      };
+
+      if (!Array.isArray(updatedResume.education)) {
+        updatedResume.education = [];
+      }
+      if (!Array.isArray(updatedResume.experience)) {
+        updatedResume.experience = [];
+      }
+
+      setFormData(updatedResume);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      console.error('Submit error:', err)
-      setError(err instanceof Error ? err.message : "Failed to save")
+      console.error('Submit error:', err);
+      setError(err instanceof Error ? err.message : "Failed to save");
     }
-  }
+  };
 
   const addEducation = () => {
     if (newEducation.degree && newEducation.university) {
-      setFormData({
-        ...formData,
-        education: [
-          ...formData.education,
-          {
-            ...newEducation,
-            _id: undefined,
-            courses: [...newEducation.courses]
-          }
-        ]
-      })
+      setFormData((prevFormData) => {
+        if (!prevFormData) return null;
+        return {
+          ...prevFormData,
+          education: [
+            ...prevFormData.education,
+            {
+              ...newEducation,
+              // No _id needed for new items, Prisma will assign 'id'
+              courses: [...newEducation.courses],
+            },
+          ],
+        };
+      });
       setNewEducation({
         degree: "",
         university: "",
         year: "",
-        courses: []
-      })
+        courses: [],
+      });
     }
-  }
+  };
 
   const addExperience = () => {
     if (newExperience.title && newExperience.company) {
-      setFormData({
-        ...formData,
-        experience: [
-          ...formData.experience,
-          {
-            ...newExperience,
-            _id: undefined,
-            achievements: [...newExperience.achievements]
-          }
-        ]
-      })
+      setFormData((prevFormData) => {
+        if (!prevFormData) return null;
+        return {
+          ...prevFormData,
+          experience: [
+            ...prevFormData.experience,
+            {
+              ...newExperience,
+              // No _id needed for new items, Prisma will assign 'id'
+              achievements: [...newExperience.achievements],
+            },
+          ],
+        };
+      });
       setNewExperience({
         title: "",
         company: "",
         period: "",
-        achievements: []
-      })
+        achievements: [],
+      });
     }
-  }
+  };
 
-  const removeEducation = (id: string | ObjectId | undefined) => {
-    if (!id) return;
+  const removeEducation = (indexToRemove: number) => {
     if (!confirm("Apakah Anda yakin ingin menghapus pendidikan ini?")) return;
-    setFormData({
-      ...formData,
-      education: formData.education.filter(edu => edu._id !== id)
-    })
-  }
+    setFormData((prevFormData) => {
+      if (!prevFormData) return null;
+      return {
+        ...prevFormData,
+        education: prevFormData.education.filter((_, index) => index !== indexToRemove),
+      };
+    });
+  };
 
-  const removeExperience = (id: string | ObjectId | undefined) => {
-    if (!id) return;
+  const removeExperience = (indexToRemove: number) => {
     if (!confirm("Apakah Anda yakin ingin menghapus pengalaman ini?")) return;
-    setFormData({
-      ...formData,
-      experience: formData.experience.filter(exp => exp._id !== id)
-    })
-  }
+    setFormData((prevFormData) => {
+      if (!prevFormData) return null;
+      return {
+        ...prevFormData,
+        experience: prevFormData.experience.filter((_, index) => index !== indexToRemove),
+      };
+    });
+  };
 
-  if (loading) return <div className="text-center p-8">Loading...</div>
-  if (error) return <div className="text-center text-red-500 p-8">{error}</div>
+  if (loading) return <div className="text-center p-8">Loading...</div>;
+  if (error) return <div className="text-center text-red-500 p-8">{error}</div>;
+  if (!formData) return <div className="text-center p-8">No resume data available.</div>;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
@@ -165,7 +239,7 @@ export default function AdminResume() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Manage Resume</h1>
           <button
-            onClick={() => window.location.href = "/admin"}
+            onClick={() => (window.location.href = "/admin")}
             className="bg-gray-700 px-4 py-2 rounded-lg hover:bg-gray-600"
           >
             Back to Dashboard
@@ -181,11 +255,21 @@ export default function AdminResume() {
                 <label className="block mb-2">Name</label>
                 <input
                   type="text"
-                  value={formData.personalInfo.name}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    personalInfo: { ...formData.personalInfo, name: e.target.value }
-                  })}
+                  value={formData.personalInfo.name || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => {
+                      if (!prev) return null;
+                      return {
+                        ...prev,
+                        personalInfo: {
+                          name: e.target.value,
+                          email: prev.personalInfo.email,
+                          location: prev.personalInfo.location,
+                          linkedin: prev.personalInfo.linkedin,
+                        },
+                      };
+                    })
+                  }
                   className="w-full bg-gray-700 p-2 rounded"
                 />
               </div>
@@ -193,11 +277,21 @@ export default function AdminResume() {
                 <label className="block mb-2">Email</label>
                 <input
                   type="email"
-                  value={formData.personalInfo.email}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    personalInfo: { ...formData.personalInfo, email: e.target.value }
-                  })}
+                  value={formData.personalInfo.email || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => {
+                      if (!prev) return null;
+                      return {
+                        ...prev,
+                        personalInfo: {
+                          name: prev.personalInfo.name,
+                          email: e.target.value,
+                          location: prev.personalInfo.location,
+                          linkedin: prev.personalInfo.linkedin,
+                        },
+                      };
+                    })
+                  }
                   className="w-full bg-gray-700 p-2 rounded"
                 />
               </div>
@@ -205,15 +299,46 @@ export default function AdminResume() {
                 <label className="block mb-2">Location</label>
                 <input
                   type="text"
-                  value={formData.personalInfo.location}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    personalInfo: { ...formData.personalInfo, location: e.target.value }
-                  })}
+                  value={formData.personalInfo.location || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => {
+                      if (!prev) return null;
+                      return {
+                        ...prev,
+                        personalInfo: {
+                          name: prev.personalInfo.name,
+                          email: prev.personalInfo.email,
+                          location: e.target.value,
+                          linkedin: prev.personalInfo.linkedin,
+                        },
+                      };
+                    })
+                  }
                   className="w-full bg-gray-700 p-2 rounded"
                 />
               </div>
-            
+              <div>
+                <label className="block mb-2">LinkedIn</label>
+                <input
+                  type="url"
+                  value={formData.personalInfo.linkedin || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => {
+                      if (!prev) return null;
+                      return {
+                        ...prev,
+                        personalInfo: {
+                          name: prev.personalInfo.name,
+                          email: prev.personalInfo.email,
+                          location: prev.personalInfo.location,
+                          linkedin: e.target.value,
+                        },
+                      };
+                    })
+                  }
+                  className="w-full bg-gray-700 p-2 rounded"
+                />
+              </div>
             </div>
           </section>
 
@@ -221,8 +346,12 @@ export default function AdminResume() {
           <section className="bg-gray-800 p-6 rounded-lg">
             <h2 className="text-xl font-semibold mb-4">Career Summary</h2>
             <textarea
-              value={formData.summary}
-              onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
+              value={formData.summary || ""}
+              onChange={(e) =>
+                setFormData((prev) =>
+                  prev ? { ...prev, summary: e.target.value } : null
+                )
+              }
               className="w-full bg-gray-700 p-2 rounded h-32"
             />
           </section>
@@ -231,15 +360,15 @@ export default function AdminResume() {
           <section className="bg-gray-800 p-6 rounded-lg">
             <h2 className="text-xl font-semibold mb-4">Education</h2>
             <div className="space-y-4 mb-4">
-              {formData.education.map((edu) => (
-                <div key={edu._id?.toString()} className="bg-gray-700 p-4 rounded">
+              {formData.education.map((edu, index) => (
+                <div key={index} className="bg-gray-700 p-4 rounded">
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold">{edu.degree}</h3>
                       <p>{edu.university}, {edu.year}</p>
                       <div className="flex flex-wrap gap-2 mt-2">
-                        {edu.courses.map((course, index) => (
-                          <span key={index} className="bg-blue-500 px-2 py-1 rounded-full text-sm">
+                        {edu.courses?.map((course, courseIndex) => (
+                          <span key={courseIndex} className="bg-blue-500 px-2 py-1 rounded-full text-sm">
                             {course}
                           </span>
                         ))}
@@ -247,7 +376,7 @@ export default function AdminResume() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => removeEducation(edu._id)}
+                      onClick={() => removeEducation(index)}
                       className="text-red-400 hover:text-red-300"
                     >
                       Remove
@@ -294,9 +423,9 @@ export default function AdminResume() {
                     if (courseInput.trim()) {
                       setNewEducation({
                         ...newEducation,
-                        courses: [...newEducation.courses, courseInput.trim()]
-                      })
-                      setCourseInput("")
+                        courses: [...newEducation.courses, courseInput.trim()],
+                      });
+                      setCourseInput("");
                     }
                   }}
                   className="bg-blue-600 px-4 rounded hover:bg-blue-700"
@@ -313,10 +442,12 @@ export default function AdminResume() {
                     {course}
                     <button
                       type="button"
-                      onClick={() => setNewEducation({
-                        ...newEducation,
-                        courses: newEducation.courses.filter((_, i) => i !== index)
-                      })}
+                      onClick={() =>
+                        setNewEducation({
+                          ...newEducation,
+                          courses: newEducation.courses.filter((_, i) => i !== index),
+                        })
+                      }
                       className="hover:text-red-300"
                     >
                       ×
@@ -338,15 +469,15 @@ export default function AdminResume() {
           <section className="bg-gray-800 p-6 rounded-lg">
             <h2 className="text-xl font-semibold mb-4">Professional Experience</h2>
             <div className="space-y-4 mb-4">
-              {formData.experience.map((exp) => (
-                <div key={exp._id?.toString()} className="bg-gray-700 p-4 rounded">
+              {formData.experience.map((exp, index) => (
+                <div key={index} className="bg-gray-700 p-4 rounded">
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold">{exp.title}</h3>
                       <p>{exp.company}, {exp.period}</p>
                       <ul className="list-disc list-inside mt-2">
-                        {exp.achievements.map((achievement, index) => (
-                          <li key={index} className="text-gray-300">
+                        {exp.achievements?.map((achievement, achievementIndex) => (
+                          <li key={achievementIndex} className="text-gray-300">
                             {achievement}
                           </li>
                         ))}
@@ -354,7 +485,7 @@ export default function AdminResume() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => removeExperience(exp._id)}
+                      onClick={() => removeExperience(index)}
                       className="text-red-400 hover:text-red-300"
                     >
                       Remove
@@ -401,9 +532,9 @@ export default function AdminResume() {
                     if (achievementInput.trim()) {
                       setNewExperience({
                         ...newExperience,
-                        achievements: [...newExperience.achievements, achievementInput.trim()]
-                      })
-                      setAchievementInput("")
+                        achievements: [...newExperience.achievements, achievementInput.trim()],
+                      });
+                      setAchievementInput("");
                     }
                   }}
                   className="bg-blue-600 px-4 rounded hover:bg-blue-700"
@@ -420,10 +551,12 @@ export default function AdminResume() {
                     {achievement}
                     <button
                       type="button"
-                      onClick={() => setNewExperience({
-                        ...newExperience,
-                        achievements: newExperience.achievements.filter((_, i) => i !== index)
-                      })}
+                      onClick={() =>
+                        setNewExperience({
+                          ...newExperience,
+                          achievements: newExperience.achievements.filter((_, i) => i !== index),
+                        })
+                      }
                       className="hover:text-red-300"
                     >
                       ×
@@ -451,13 +584,13 @@ export default function AdminResume() {
                   type="file"
                   accept=".pdf"
                   onChange={(e) => {
-                    const file = e.target.files?.[0]
+                    const file = e.target.files?.[0];
                     if (file) {
-                      setFormData({
-                        ...formData,
+                      setFormData((prev) => ({
+                        ...(prev as Resume), // Cast to Resume to ensure type safety
                         pdfFile: file,
-                        pdfFileName: file.name
-                      })
+                        pdfFileName: file.name,
+                      }));
                     }
                   }}
                   className="w-full bg-gray-700 p-2 rounded"
@@ -467,6 +600,16 @@ export default function AdminResume() {
                 <p className="text-sm text-gray-400">
                   Current file: {formData.pdfFileName}
                 </p>
+              )}
+              {formData.pdfFileName && (
+                <a
+                  href={`/api/resume?download=true`} // Updated download URL
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:underline text-sm"
+                >
+                  Download Current PDF
+                </a>
               )}
             </div>
           </section>
@@ -487,5 +630,5 @@ export default function AdminResume() {
         </form>
       </div>
     </div>
-  )
+  );
 }

@@ -5,6 +5,19 @@ import { motion } from "framer-motion"
 import Link from "next/link"
 import type { Resume } from "@/app/types"
 
+// Helper to parse JSON strings from API response
+const parseJsonField = (data: any, field: string, defaultValue: any) => {
+  if (data && typeof data[field] === 'string') {
+    try {
+      return JSON.parse(data[field]);
+    } catch (e) {
+      console.error(`Failed to parse ${field}`, e);
+      return defaultValue;
+    }
+  }
+  return data?.[field] || defaultValue;
+};
+
 export default function Resume() {
   const [resume, setResume] = useState<Resume | null>(null)
   const [loading, setLoading] = useState(true)
@@ -15,7 +28,32 @@ export default function Resume() {
       try {
         const response = await fetch("/api/resume")
         if (!response.ok) throw new Error("Failed to fetch resume")
-        const data = await response.json()
+        let data = await response.json()
+
+        if (data) {
+          // Parse JSON string fields
+          data.personalInfo = parseJsonField(data, 'personalInfo', {});
+          data.education = parseJsonField(data, 'education', []);
+          data.experience = parseJsonField(data, 'experience', []);
+
+          // Ensure they are arrays, even if parsing failed or returned something else
+          if (!Array.isArray(data.education)) {
+            data.education = [];
+          }
+          if (!Array.isArray(data.experience)) {
+            data.experience = [];
+          }
+        } else {
+          // Initialize with default structure if no data exists
+          data = {
+            personalInfo: { name: "", email: "", location: "", linkedin: "" },
+            summary: "",
+            education: [],
+            experience: [],
+            pdfFileName: null,
+            contentType: null,
+          };
+        }
         setResume(data)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong")
@@ -29,9 +67,7 @@ export default function Resume() {
 
   const handleDownload = async () => {
     try {
-      const response = await fetch('/api/resume', {
-        method: 'POST',
-      })
+      const response = await fetch('/api/resume?download=true')
       
       if (!response.ok) throw new Error('Download failed')
       
@@ -148,7 +184,7 @@ export default function Resume() {
         <div className="space-y-4">
           {resume.education.map((edu) => (
             <motion.div 
-              key={edu._id?.toString() || `edu-${edu.university}-${edu.year}`}
+              key={`edu-${edu.university}-${edu.year}`}
               className="bg-gray-800 p-6 rounded-lg"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -156,13 +192,13 @@ export default function Resume() {
             >
               <h3 className="text-xl font-medium text-white">{edu.degree}</h3>
               <p className="text-gray-400 mb-2">{edu.university}, {edu.year}</p>
-              {edu.courses.length > 0 && (
+              {edu.courses && edu.courses.length > 0 && (
                 <div>
                   <p className="text-white mb-2">Relevant Coursework:</p>
                   <div className="flex flex-wrap gap-2">
                     {edu.courses.map((course, courseIndex) => (
                       <span 
-                        key={`${edu._id}-course-${courseIndex}`}
+                        key={`${edu.university}-course-${courseIndex}`}
                         className="bg-blue-500 bg-opacity-20 text-blue-300 px-3 py-1 rounded-full text-sm"
                       >
                         {course}
@@ -185,7 +221,7 @@ export default function Resume() {
         <div className="space-y-4">
           {resume.experience.map((exp) => (
             <motion.div 
-              key={exp._id?.toString() || `exp-${exp.company}-${exp.period}`}
+              key={`exp-${exp.company}-${exp.period}`}
               className="bg-gray-800 p-6 rounded-lg"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -194,9 +230,9 @@ export default function Resume() {
               <h3 className="text-xl font-medium text-white">{exp.title}</h3>
               <p className="text-gray-400 mb-2">{exp.company}, {exp.period}</p>
               <ul className="list-disc list-inside space-y-1">
-                {exp.achievements.map((achievement, achievementIndex) => (
+                {exp.achievements && exp.achievements.map((achievement, achievementIndex) => (
                   <li 
-                    key={`${exp._id}-achievement-${achievementIndex}`}
+                    key={`${exp.company}-achievement-${achievementIndex}`}
                     className="text-gray-300"
                   >
                     {achievement}

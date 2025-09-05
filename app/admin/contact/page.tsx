@@ -1,50 +1,53 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
-import { ContactMessage } from "@/app/types"
-import { format } from "date-fns"
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { ContactMessage } from "@/app/types";
+import { format } from "date-fns";
 
 export default function AdminContact() {
-  const [messages, setMessages] = useState<ContactMessage[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchMessages()
-  }, [])
+    fetchMessages();
+  }, []);
 
   async function fetchMessages() {
     try {
-      const response = await fetch("/api/contact")
-      if (!response.ok) throw new Error("Failed to fetch messages")
-      const data = await response.json()
-      setMessages(data)
+      const response = await fetch("/api/contact");
+      if (!response.ok) throw new Error("Failed to fetch messages");
+      const data: ContactMessage[] = await response.json();
+      setMessages(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong")
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this message?")) return
+    if (!confirm("Are you sure you want to delete this message?")) return;
     
     try {
       const response = await fetch(`/api/contact?id=${id}`, {
         method: "DELETE",
-      })
+      });
       
-      if (!response.ok) throw new Error("Failed to delete message")
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete message");
+      }
       
-      await fetchMessages()
+      await fetchMessages(); // Re-fetch messages after successful deletion
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete")
+      setError(err instanceof Error ? err.message : "Failed to delete");
     }
-  }
+  };
 
-  if (loading) return <div className="text-center p-8">Loading...</div>
-  if (error) return <div className="text-center text-red-500 p-8">{error}</div>
+  if (loading) return <div className="text-center p-8">Loading...</div>;
+  if (error) return <div className="text-center text-red-500 p-8">{error}</div>;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
@@ -52,7 +55,7 @@ export default function AdminContact() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Contact Messages</h1>
           <button
-            onClick={() => window.location.href = "/admin"}
+            onClick={() => (window.location.href = "/admin")}
             className="bg-gray-700 px-4 py-2 rounded-lg hover:bg-gray-600"
           >
             Back to Dashboard
@@ -67,7 +70,7 @@ export default function AdminContact() {
           ) : (
             messages.map((message) => (
               <motion.div
-                key={message._id?.toString() || `message-${message.email}`}
+                key={message.id || `message-${message.email}`} // Use message.id
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-gray-800 p-6 rounded-lg"
@@ -85,7 +88,7 @@ export default function AdminContact() {
                       {message.createdAt && format(new Date(message.createdAt), 'PPpp')}
                     </span>
                     <button
-                      onClick={() => message._id && handleDelete(message._id.toString())}
+                      onClick={() => message.id && handleDelete(message.id)} // Use message.id
                       className="text-red-400 hover:text-red-300"
                     >
                       Delete
@@ -99,5 +102,5 @@ export default function AdminContact() {
         </div>
       </div>
     </div>
-  )
-} 
+  );
+}
